@@ -470,21 +470,60 @@ def main():
             else:
                 ranking_scores.sort(key=lambda x: x["axes"].get(sort_by, 0), reverse=True)
 
-            # Table
-            rows = []
-            for i, s in enumerate(ranking_scores, 1):
-                row = {
-                    "Rank": i,
-                    "Agency": f"{s['abbr']}",
-                    "Total": s["total"],
-                }
-                for axis in AXES_LABELS:
-                    row[axis] = int(s["axes"].get(axis, 0))
-                row["Budget"] = _fmt_budget(s["budget_authority"])
-                rows.append(row)
+            # Delta from daily history
+            history = _load_scores_history()
+            dates = sorted(history.keys(), reverse=True) if history else []
 
-            df = pd.DataFrame(rows)
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            # Render as styled cards (matching FRS-1000)
+            for idx, s in enumerate(ranking_scores, 1):
+                score = s["total"]
+                if score >= 700:
+                    bar_color = "#10b981"
+                elif score >= 500:
+                    bar_color = "#2E7BE6"
+                elif score >= 300:
+                    bar_color = "#f59e0b"
+                else:
+                    bar_color = "#ef4444"
+
+                # Delta
+                prev_score = None
+                for dt in dates:
+                    prev_score = history[dt].get(s["name"])
+                    if prev_score is not None:
+                        break
+                if prev_score is not None:
+                    d_val = score - prev_score
+                    if d_val > 0:
+                        change_html = f'<span style="color:#10b981; font-weight:700;">&#9650; +{d_val}</span>'
+                    elif d_val < 0:
+                        change_html = f'<span style="color:#ef4444; font-weight:700;">&#9660; {d_val}</span>'
+                    else:
+                        change_html = f'<span style="color:#94a3b8; font-weight:700;">&#9644; 0</span>'
+                else:
+                    change_html = '<span style="color:#94a3b8;">-</span>'
+
+                st.markdown(f"""
+                <div style="display:flex; align-items:center; padding:14px 20px; background:#fff; border-radius:12px; margin-bottom:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="font-size:1.4em; font-weight:900; color:#94a3b8; width:40px;">#{idx}</div>
+                    <div style="flex:1;">
+                        <div style="font-size:1.05em; font-weight:700; color:#1e293b;">{s['name']}</div>
+                        <span style="font-size:0.75em; background:#2E7BE6; color:#fff; padding:2px 8px; border-radius:20px;">{s['abbr']}</span>
+                    </div>
+                    <div style="text-align:right; margin-right:15px; font-size:0.85em; color:#94a3b8;">
+                        {_fmt_budget(s['budget_authority'])}
+                    </div>
+                    <div style="text-align:right; margin-right:20px;">
+                        {change_html}
+                    </div>
+                    <div style="text-align:right; min-width:80px;">
+                        <div style="font-size:1.5em; font-weight:900; color:{bar_color};">{score}</div>
+                        <div style="background:#f1f5f9; border-radius:4px; height:6px; width:80px; margin-top:4px;">
+                            <div style="background:{bar_color}; height:6px; border-radius:4px; width:{score/10}%;"></div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
             # Bar chart
             st.markdown("<div class='section-title'>Score Distribution</div>",
