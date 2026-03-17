@@ -307,20 +307,23 @@ def main():
             else:
                 score_color = "#ef4444"
 
-            st.markdown(
-                f"""<div class="total-score-container">
-                <div class="total-score-label">GOV-1000 SCORE</div>
-                <div class="total-score-val" style="color:{score_color};">{total}</div>
-                </div>""",
-                unsafe_allow_html=True,
-            )
+            st.markdown(f"""
+            <div style="text-align:center; margin-top:4px; margin-bottom:10px;">
+                <div style="font-size:14px; letter-spacing:2px; color:#666;">TOTAL SCORE</div>
+                <div style="font-size:90px; font-weight:800; color:#2E7BE6; line-height:1;">
+                    {total}
+                    <span style="font-size:35px; color:#BBB;">/ 1000</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
             render_score_delta(data["name"], total)
 
-            # Layout: Radar + Axis cards
-            col_radar, col_axes = st.columns([3, 2])
+            # Layout: Radar + Axis cards (match FRS-1000 proportions)
+            col_radar, col_axes = st.columns([1.8, 1])
 
             with col_radar:
+                st.markdown("<div style='font-size: 1.1em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 5px;'>I. Intelligence Radar</div>", unsafe_allow_html=True)
                 fig = render_radar_chart(data, st.session_state.saved_agency_data, AXES_LABELS)
                 st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
@@ -336,17 +339,40 @@ def main():
                         st.rerun()
 
             with col_axes:
+                st.markdown(
+                    "<div style='font-size: 0.9em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 15px; border-left: 3px solid #2E7BE6; padding-left: 8px;'>II. ANALYSIS SCORE METRICS</div>",
+                    unsafe_allow_html=True
+                )
+
+                saved = st.session_state.saved_agency_data
                 for axis in AXES_LABELS:
-                    v = data["axes"][axis]
+                    v1 = data["axes"][axis]
+                    v2 = saved["axes"].get(axis, 0) if saved else None
+                    desc_text = LOGIC_DESC.get(axis, "")
+
+                    score_html = f'<span style="color: #2E7BE6;">{int(v1)}</span>'
+                    if v2 is not None:
+                        score_html += f' <span style="color: #ccc; font-size: 0.9em; font-weight:bold; margin: 0 6px;">vs</span> <span style="color: #F4A261;">{int(v2)}</span>'
+
                     st.markdown(
-                        f"""<div class="dna-card">
-                        <div>
-                            <div class="dna-label">{axis}</div>
-                            <div style="font-size:11px; color:#94a3b8;">{LOGIC_DESC.get(axis, '')}</div>
+                        f"""
+                        <div style="
+                            background-color: #FFFFFF;
+                            padding: 20px;
+                            border-radius: 12px;
+                            margin-bottom: 12px;
+                            border: 1px solid #E0E0E0;
+                            border-left: 8px solid #2E7BE6;
+                            box-shadow: 2px 2px 5px rgba(0,0,0,0.07);
+                        ">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span style="font-size: 1.2em; font-weight: 800; color: #333333;">{axis}</span>
+                                <span style="font-size: 1.7em; font-weight: 900; line-height: 1;">{score_html}</span>
+                            </div>
+                            <p style="font-size: 0.95em; color: #777777; margin: 0; line-height: 1.3; font-weight: 500;">{desc_text}</p>
                         </div>
-                        <div class="dna-value">{v}</div>
-                        </div>""",
-                        unsafe_allow_html=True,
+                        """,
+                        unsafe_allow_html=True
                     )
 
             # Budget snapshot
