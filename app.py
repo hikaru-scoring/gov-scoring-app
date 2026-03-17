@@ -296,17 +296,41 @@ def main():
             data = score_agency(selected_code)
 
         if data:
-            # Total score
             total = data["total"]
-            if total >= 800:
-                score_color = "#10b981"
-            elif total >= 600:
-                score_color = "#2E7BE6"
-            elif total >= 400:
-                score_color = "#f59e0b"
-            else:
-                score_color = "#ef4444"
 
+            snapshot = {
+                "Budget Authority": _fmt_budget(data["budget_authority"]),
+                "Obligated": _fmt_budget(data["obligated"]),
+                "Outlays": _fmt_budget(data["outlay"]),
+                "% of Federal Budget": f"{data['pct_of_total']:.1f}%",
+            }
+
+            # --- Buttons row (matches FRS-1000: Save | Clear | PDF | CSV) ---
+            col_btn1, col_btn2, col_btn3, col_btn4, col_btn_rest = st.columns([1, 1, 1.5, 1.5, 5.5])
+            with col_btn1:
+                save_it = st.button("Save")
+            with col_btn2:
+                clear_it = st.button("Clear")
+            with col_btn3:
+                pdf_bytes = generate_pdf(data, AXES_LABELS, "Federal Agency",
+                                         LOGIC_DESC, snapshot, company_name)
+                st.download_button("PDF", pdf_bytes,
+                                   file_name=f"GOV1000_{data['abbr']}.pdf",
+                                   mime="application/pdf")
+            with col_btn4:
+                csv_bytes = generate_csv(data, AXES_LABELS, LOGIC_DESC, snapshot)
+                st.download_button("CSV", csv_bytes,
+                                   file_name=f"GOV1000_{data['abbr']}.csv",
+                                   mime="text/csv")
+
+            if save_it:
+                st.session_state.saved_agency_data = data
+                st.rerun()
+            if clear_it:
+                st.session_state.saved_agency_data = None
+                st.rerun()
+
+            # --- Total Score ---
             st.markdown(f"""
             <div style="text-align:center; margin-top:4px; margin-bottom:10px;">
                 <div style="font-size:14px; letter-spacing:2px; color:#666;">TOTAL SCORE</div>
@@ -319,24 +343,13 @@ def main():
 
             render_score_delta(data["name"], total)
 
-            # Layout: Radar + Axis cards (match FRS-1000 proportions)
+            # --- I. Radar + II. Score Metrics ---
             col_radar, col_axes = st.columns([1.8, 1])
 
             with col_radar:
                 st.markdown("<div style='font-size: 1.1em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 5px;'>I. Intelligence Radar</div>", unsafe_allow_html=True)
                 fig = render_radar_chart(data, st.session_state.saved_agency_data, AXES_LABELS)
                 st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-
-                # Save / Clear
-                c1, c2 = st.columns(2)
-                with c1:
-                    if st.button("Save for Comparison", use_container_width=True):
-                        st.session_state.saved_agency_data = data
-                        st.rerun()
-                with c2:
-                    if st.button("Clear Comparison", use_container_width=True):
-                        st.session_state.saved_agency_data = None
-                        st.rerun()
 
             with col_axes:
                 st.markdown(
@@ -375,43 +388,50 @@ def main():
                         unsafe_allow_html=True
                     )
 
-            # Budget snapshot
-            st.markdown("<div class='section-title'>Budget Snapshot</div>",
+            # --- III. Budget Snapshot (styled cards like FRS-1000) ---
+            st.markdown("<div class='section-title'>III. Budget Snapshot</div>",
                         unsafe_allow_html=True)
-            snap_cols = st.columns(4)
-            snap_cols[0].metric("Budget Authority", _fmt_budget(data["budget_authority"]))
-            snap_cols[1].metric("Obligated", _fmt_budget(data["obligated"]))
-            snap_cols[2].metric("Outlays", _fmt_budget(data["outlay"]))
-            snap_cols[3].metric("% of Federal Budget", f"{data['pct_of_total']:.1f}%")
+            bs1, bs2, bs3, bs4 = st.columns(4)
+            budget_items = [
+                (bs1, "BUDGET AUTHORITY", _fmt_budget(data["budget_authority"])),
+                (bs2, "OBLIGATED", _fmt_budget(data["obligated"])),
+                (bs3, "OUTLAYS", _fmt_budget(data["outlay"])),
+                (bs4, "% OF FEDERAL BUDGET", f"{data['pct_of_total']:.1f}%"),
+            ]
+            for col, label, value in budget_items:
+                col.markdown(f"""
+                <div style="background:#fff; padding:20px; border-radius:12px; text-align:center; border:1px solid #e2e8f0; box-shadow:2px 2px 5px rgba(0,0,0,0.04);">
+                    <div style="font-size:0.7em; font-weight:700; color:#94a3b8; letter-spacing:1px;">{label}</div>
+                    <div style="font-size:1.8em; font-weight:900; color:#1e293b; line-height:1.3;">{value}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
-            # Daily tracker
-            st.markdown("<div class='section-title'>Score History</div>",
+            # --- IV. Daily Score Tracker ---
+            st.markdown("<div class='section-title'>IV. Daily Score Tracker</div>",
                         unsafe_allow_html=True)
             render_daily_score_tracker(data["name"])
 
-            # Export
-            st.markdown("<div class='section-title'>Export</div>",
+            # --- V. Score Comparison ---
+            st.markdown("<div class='section-title'>V. Score Comparison</div>",
                         unsafe_allow_html=True)
 
-            snapshot = {
-                "Budget Authority": _fmt_budget(data["budget_authority"]),
-                "Obligated": _fmt_budget(data["obligated"]),
-                "Outlays": _fmt_budget(data["outlay"]),
-                "% of Federal Budget": f"{data['pct_of_total']:.1f}%",
-            }
+            sc1, sc2, sc3 = st.columns(3)
+            t1 = int(data.get("total", 0))
+            t_html = f'<span style="color:#2E7BE6;">{t1}</span>'
+            saved = st.session_state.saved_agency_data
+            if saved:
+                t2 = int(saved.get("total", 0))
+                t_html += f' <span style="font-size:0.5em; color:#666;">vs</span> <span style="color:#F4A261;">{t2}</span>'
+            sc1.markdown(f'<div class="card"><div style="font-size:11px; color:#999;">TOTAL SCORE</div><div style="font-size:22px; font-weight:900;">{t_html}</div></div>', unsafe_allow_html=True)
 
-            exp_c1, exp_c2 = st.columns(2)
-            with exp_c1:
-                pdf_bytes = generate_pdf(data, AXES_LABELS, "Federal Agency",
-                                         LOGIC_DESC, snapshot, company_name)
-                st.download_button("Download PDF", pdf_bytes,
-                                   file_name=f"GOV1000_{data['abbr']}.pdf",
-                                   mime="application/pdf", use_container_width=True)
-            with exp_c2:
-                csv_bytes = generate_csv(data, AXES_LABELS, LOGIC_DESC, snapshot)
-                st.download_button("Download CSV", csv_bytes,
-                                   file_name=f"GOV1000_{data['abbr']}.csv",
-                                   mime="text/csv", use_container_width=True)
+            axes1 = data.get("axes", {})
+            best1 = max(axes1, key=axes1.get) if axes1 else "N/A"
+            best1_val = int(axes1.get(best1, 0))
+            sc2.markdown(f'<div class="card"><div style="font-size:11px; color:#999;">STRONGEST</div><div style="font-size:18px; font-weight:900;"><span style="color:#2E7BE6;">{best1} ({best1_val})</span></div></div>', unsafe_allow_html=True)
+
+            worst1 = min(axes1, key=axes1.get) if axes1 else "N/A"
+            worst1_val = int(axes1.get(worst1, 0))
+            sc3.markdown(f'<div class="card"><div style="font-size:11px; color:#999;">WEAKEST</div><div style="font-size:18px; font-weight:900;"><span style="color:#ef4444;">{worst1} ({worst1_val})</span></div></div>', unsafe_allow_html=True)
         else:
             st.error("Failed to load agency data.")
 
