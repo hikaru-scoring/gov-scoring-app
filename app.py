@@ -9,7 +9,7 @@ import streamlit as st
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from data_logic import AGENCIES, AXES_LABELS, score_agency
-from ui_components import render_radar_chart
+from ui_components import inject_css, render_radar_chart
 from pdf_report import generate_pdf
 
 APP_TITLE = "GOV-1000 — Agency Scoring Platform"
@@ -126,11 +126,10 @@ def _fmt_budget(amount: float) -> str:
 # Main
 # ---------------------------------------------------------------------------
 def main():
-    # Hide Streamlit chrome
+    # Inject shared CSS (matches FRS-1000 styling)
+    inject_css()
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-    .block-container { padding-top: 1rem !important; max-width: 1200px; font-family: 'Inter', sans-serif; }
     header[data-testid="stHeader"] { display: none !important; }
     footer { display: none !important; }
     #MainMenu { display: none !important; }
@@ -139,12 +138,6 @@ def main():
     div[data-testid="stStatusWidget"] { display: none !important; }
     div[class*="viewerBadge"] { display: none !important; }
     div[class*="embeddedAppMetaInfoBar"] { display: none !important; }
-
-    .dna-card { background:#ffffff; border-radius:10px; padding:15px 20px; border:1px solid #EDEDED;
-                margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;
-                box-shadow:0 2px 10px rgba(0,0,0,0.02); }
-    .dna-label { font-size:14px; color:#444; font-weight:600; }
-    .dna-value { font-size:26px; font-weight:900; color:#1A1C1E; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -253,8 +246,7 @@ def main():
                                     st.markdown(f"<span style='color:#ef4444; font-weight:700;'>&#9660; {m['name']} {m['delta']}</span>", unsafe_allow_html=True)
 
             # Agency cards grid
-            st.markdown("<div style='font-size:1.1em; font-weight:700; color:#2E7BE6; margin:25px 0 15px; "
-                        "text-transform:uppercase; letter-spacing:1px;'>All Agencies</div>",
+            st.markdown("<div class='section-title'>All Agencies</div>",
                         unsafe_allow_html=True)
 
             cols = st.columns(3)
@@ -316,9 +308,9 @@ def main():
                 score_color = "#ef4444"
 
             st.markdown(
-                f"""<div style="text-align:center; padding:20px; margin-bottom:20px; border-bottom:2px solid #F0F0F0;">
-                <div style="font-size:16px; color:#666; font-weight:700; letter-spacing:2px;">GOV-1000 SCORE</div>
-                <div style="font-size:90px; font-weight:900; color:{score_color}; line-height:1;">{total}</div>
+                f"""<div class="total-score-container">
+                <div class="total-score-label">GOV-1000 SCORE</div>
+                <div class="total-score-val" style="color:{score_color};">{total}</div>
                 </div>""",
                 unsafe_allow_html=True,
             )
@@ -358,8 +350,7 @@ def main():
                     )
 
             # Budget snapshot
-            st.markdown("<div style='font-size:1em; font-weight:700; color:#2E7BE6; margin:25px 0 10px; "
-                        "text-transform:uppercase; letter-spacing:1px;'>Budget Snapshot</div>",
+            st.markdown("<div class='section-title'>Budget Snapshot</div>",
                         unsafe_allow_html=True)
             snap_cols = st.columns(4)
             snap_cols[0].metric("Budget Authority", _fmt_budget(data["budget_authority"]))
@@ -368,14 +359,12 @@ def main():
             snap_cols[3].metric("% of Federal Budget", f"{data['pct_of_total']:.1f}%")
 
             # Daily tracker
-            st.markdown("<div style='font-size:1em; font-weight:700; color:#2E7BE6; margin:25px 0 10px; "
-                        "text-transform:uppercase; letter-spacing:1px;'>Score History</div>",
+            st.markdown("<div class='section-title'>Score History</div>",
                         unsafe_allow_html=True)
             render_daily_score_tracker(data["name"])
 
             # Export
-            st.markdown("<div style='font-size:1em; font-weight:700; color:#2E7BE6; margin:25px 0 10px; "
-                        "text-transform:uppercase; letter-spacing:1px;'>Export</div>",
+            st.markdown("<div class='section-title'>Export</div>",
                         unsafe_allow_html=True)
 
             snapshot = {
@@ -452,8 +441,7 @@ def main():
             st.dataframe(df, use_container_width=True, hide_index=True)
 
             # Bar chart
-            st.markdown("<div style='font-size:1em; font-weight:700; color:#2E7BE6; margin:25px 0 10px; "
-                        "text-transform:uppercase; letter-spacing:1px;'>Score Distribution</div>",
+            st.markdown("<div class='section-title'>Score Distribution</div>",
                         unsafe_allow_html=True)
 
             fig_bar = go.Figure()
@@ -483,8 +471,7 @@ def main():
             st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
 
             # Stacked axis breakdown
-            st.markdown("<div style='font-size:1em; font-weight:700; color:#2E7BE6; margin:25px 0 10px; "
-                        "text-transform:uppercase; letter-spacing:1px;'>Axis Breakdown</div>",
+            st.markdown("<div class='section-title'>Axis Breakdown</div>",
                         unsafe_allow_html=True)
 
             axis_colors = ["#2E7BE6", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444"]
