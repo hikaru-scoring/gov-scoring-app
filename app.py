@@ -126,17 +126,26 @@ def _fmt_budget(amount: float) -> str:
 # Main
 # ---------------------------------------------------------------------------
 def main():
-    # Inject shared CSS (matches FRS-1000 styling)
+    # CSS (exact copy from FRS-1000)
     inject_css()
     st.markdown("""
     <style>
+    .block-container { padding-top: 1rem !important; }
     header[data-testid="stHeader"] { display: none !important; }
     footer { display: none !important; }
     #MainMenu { display: none !important; }
+    .viewerBadge_container__r5tak { display: none !important; }
+    .styles_viewerBadge__CvC9N { display: none !important; }
+    [data-testid="stActionButtonIcon"] { display: none !important; }
+    [data-testid="manage-app-button"] { display: none !important; }
+    a[href*="github.com"] img { display: none !important; }
+    div[class*="viewerBadge"] { display: none !important; }
+    div[class*="StatusWidget"] { display: none !important; }
+    div[data-testid="stStatusWidget"] { display: none !important; }
+    iframe[title="streamlit_lottie.streamlit_lottie"] { display: none !important; }
     .stDeployButton { display: none !important; }
     div[class*="stToolbar"] { display: none !important; }
-    div[data-testid="stStatusWidget"] { display: none !important; }
-    div[class*="viewerBadge"] { display: none !important; }
+    div.embeddedAppMetaInfoBar_container__DxxL1 { display: none !important; }
     div[class*="embeddedAppMetaInfoBar"] { display: none !important; }
     </style>
     """, unsafe_allow_html=True)
@@ -220,7 +229,7 @@ def main():
                 unsafe_allow_html=True,
             )
 
-            # Top / Bottom movers (from history)
+            # Top / Bottom movers (from history — styled like FRS-1000)
             history = _load_scores_history()
             if history:
                 dates = sorted(history.keys(), reverse=True)
@@ -231,19 +240,34 @@ def main():
                         prev_score = prev.get(s["name"])
                         if prev_score is not None:
                             deltas.append({"name": s["abbr"], "delta": s["total"] - prev_score})
-                    if deltas:
+                    if deltas and any(d["delta"] != 0 for d in deltas):
                         deltas.sort(key=lambda x: x["delta"], reverse=True)
-                        col_up, col_down = st.columns(2)
-                        with col_up:
-                            st.markdown("**Top Movers**")
-                            for m in deltas[:3]:
+                        top_movers = deltas[:3]
+                        bottom_movers = sorted(deltas, key=lambda x: x["delta"])[:3]
+
+                        mv1, mv2 = st.columns(2)
+                        with mv1:
+                            st.markdown("<div style='font-size:1em; font-weight:700; color:#10b981; margin-bottom:10px;'>Top Movers</div>", unsafe_allow_html=True)
+                            for m in top_movers:
                                 if m["delta"] > 0:
-                                    st.markdown(f"<span style='color:#10b981; font-weight:700;'>&#9650; {m['name']} +{m['delta']}</span>", unsafe_allow_html=True)
-                        with col_down:
-                            st.markdown("**Bottom Movers**")
-                            for m in deltas[-3:]:
+                                    st.markdown(f"""
+                                    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#f0fdf4; border-radius:8px; margin-bottom:6px;">
+                                        <span style="font-weight:600; color:#1e293b;">{m['name']}</span>
+                                        <span style="font-weight:700; color:#10b981;">&#9650; {m['delta']:+d}</span>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                        with mv2:
+                            st.markdown("<div style='font-size:1em; font-weight:700; color:#ef4444; margin-bottom:10px;'>Bottom Movers</div>", unsafe_allow_html=True)
+                            for m in bottom_movers:
                                 if m["delta"] < 0:
-                                    st.markdown(f"<span style='color:#ef4444; font-weight:700;'>&#9660; {m['name']} {m['delta']}</span>", unsafe_allow_html=True)
+                                    st.markdown(f"""
+                                    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:#fef2f2; border-radius:8px; margin-bottom:6px;">
+                                        <span style="font-weight:600; color:#1e293b;">{m['name']}</span>
+                                        <span style="font-weight:700; color:#ef4444;">&#9660; {m['delta']:+d}</span>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+
+                        st.markdown("<div style='height:15px;'></div>", unsafe_allow_html=True)
 
             # Agency cards grid
             st.markdown("<div class='section-title'>All Agencies</div>",
@@ -304,6 +328,12 @@ def main():
                 "Outlays": _fmt_budget(data["outlay"]),
                 "% of Federal Budget": f"{data['pct_of_total']:.1f}%",
             }
+
+            # Agency name (matches FRS-1000 asset name display)
+            st.markdown(
+                f'<div style="font-size:1.1em; font-weight:700; color:#333; margin:4px 0 2px;">{data["name"]}</div>',
+                unsafe_allow_html=True
+            )
 
             # --- Buttons row (matches FRS-1000: Save | Clear | PDF | CSV) ---
             col_btn1, col_btn2, col_btn3, col_btn4, col_btn_rest = st.columns([1, 1, 1.5, 1.5, 5.5])
@@ -440,8 +470,8 @@ def main():
     # ===================================================================
     with tab_rankings:
         st.markdown(
-            "<div style='font-size:1.5em; font-weight:900; color:#1e3a8a; margin-bottom:15px;'>"
-            "Agency Rankings</div>",
+            "<div style='font-size:1.5em; font-weight:900; color:#1e3a8a; margin-bottom:20px;'>"
+            "All Agencies Ranking</div>",
             unsafe_allow_html=True,
         )
 
