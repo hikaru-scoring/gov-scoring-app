@@ -3,7 +3,8 @@
 import json
 import os
 import sys
-from datetime import date, datetime
+import time
+from datetime import date
 
 import requests
 
@@ -31,7 +32,7 @@ AGENCIES = {
 
 def _current_fy() -> int:
     today = date.today()
-    return today.year if today.month >= 10 else today.year
+    return today.year + 1 if today.month >= 10 else today.year
 
 
 def _clamp(value: float, lo: float = 0, hi: float = 200) -> int:
@@ -39,16 +40,29 @@ def _clamp(value: float, lo: float = 0, hi: float = 200) -> int:
 
 
 def _fetch_json(url: str, method: str = "GET", payload: dict = None) -> dict | None:
-    try:
-        if method == "POST":
-            r = requests.post(url, json=payload, timeout=30)
-        else:
-            r = requests.get(url, timeout=30)
-        if r.status_code != 200:
+    """Fetch JSON with retry logic and delay."""
+    for attempt in range(3):
+        try:
+            if method == "POST":
+                r = requests.post(url, json=payload, timeout=60)
+            else:
+                r = requests.get(url, timeout=60)
+            if r.status_code == 200:
+                return r.json()
+            if r.status_code == 429:
+                # Rate limited - wait longer
+                print(f"    Rate limited, waiting {10 * (attempt + 1)}s...")
+                time.sleep(10 * (attempt + 1))
+                continue
+            print(f"    HTTP {r.status_code} for {url}")
             return None
-        return r.json()
-    except Exception:
-        return None
+        except requests.exceptions.Timeout:
+            print(f"    Timeout (attempt {attempt + 1}/3) for {url}")
+            time.sleep(5)
+        except Exception as e:
+            print(f"    Error (attempt {attempt + 1}/3): {e}")
+            time.sleep(5)
+    return None
 
 
 def _load_gao() -> dict:
@@ -68,6 +82,7 @@ def score_one(toptier_code: str, agency_list: list) -> int | None:
             agency_row = a
             break
     if not agency_row:
+        print(f"    Agency code {toptier_code} not found in agency list")
         return None
 
     # Axis 1: Budget Efficiency
@@ -81,6 +96,8 @@ def score_one(toptier_code: str, agency_list: list) -> int | None:
     else:
         budget_efficiency = 100
 
+    time.sleep(1)  # Delay between API calls
+
     # Axis 2: Transparency
     overview = _fetch_json(f"{API_BASE}/agency/{toptier_code}/")
     if overview:
@@ -93,6 +110,8 @@ def score_one(toptier_code: str, agency_list: list) -> int | None:
         transparency = _clamp(cj + sub_s + comp)
     else:
         transparency = 100
+
+    time.sleep(1)
 
     # Axis 3: Performance
     sub_data = _fetch_json(
@@ -109,6 +128,8 @@ def score_one(toptier_code: str, agency_list: list) -> int | None:
         )
     else:
         performance = 100
+
+    time.sleep(1)
 
     # Axis 4: Fiscal Discipline
     budget_hist_data = _fetch_json(f"{API_BASE}/agency/{toptier_code}/budgetary_resources/")
@@ -131,7 +152,8 @@ def score_one(toptier_code: str, agency_list: list) -> int | None:
     findings = gao.get(toptier_code, 5)
     accountability = _clamp(200 - findings * 20)
 
-    return budget_efficiency + transparency + performance + fiscal_discipline + accountability
+    total = budget_efficiency + transparency + performance + fiscal_discipline + accountability
+    return total
 
 
 def main():
@@ -145,26 +167,42 @@ def main():
     else:
         history = {}
 
-    # Fetch agency list once
-    data = _fetch_json(f"{API_BASE}/references/toptier_agencies/")
+    # Skip if already recorded today
+    if today_str in history:
+        print(f"[GOV-1000] Scores already recorded for {today_str}, skipping")
+        sys.exit(0)
+
+    # Fetch agency list with retry
+    print("  Fetching agency list...")
+    data = None
+    for attempt in range(3):
+        data = _fetch_json(f"{API_BASE}/references/toptier_agencies/")
+        if data:
+            break
+        print(f"  Retry {attempt + 1}/3 for agency list...")
+        time.sleep(10)
+
     if not data:
-        print("ERROR: Failed to fetch agency list")
+        print("ERROR: Failed to fetch agency list after 3 attempts")
         sys.exit(1)
     agency_list = data.get("results", [])
+    print(f"  Found {len(agency_list)} agencies in API")
 
     day_scores = {}
     success = 0
     for code, name in AGENCIES.items():
+        print(f"  Scoring {name}...")
         score = score_one(code, agency_list)
         if score is not None:
             day_scores[name] = score
             success += 1
-            print(f"  {name}: {score}")
+            print(f"    {name}: {score}")
         else:
-            print(f"  {name}: FAILED")
+            print(f"    {name}: FAILED")
+        time.sleep(2)  # Delay between agencies
 
     if success < 5:
-        print(f"ERROR: Only {success} agencies scored, skipping save")
+        print(f"ERROR: Only {success}/15 agencies scored, skipping save")
         sys.exit(1)
 
     history[today_str] = day_scores
@@ -172,7 +210,7 @@ def main():
     with open(HISTORY_FILE, "w") as f:
         json.dump(history, f, indent=2)
 
-    print(f"[GOV-1000] Saved {success} scores for {today_str}")
+    print(f"[GOV-1000] Saved {success}/15 scores for {today_str}")
 
 
 if __name__ == "__main__":

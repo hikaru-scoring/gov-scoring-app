@@ -20,6 +20,7 @@ jobs:
 
       - name: Record scores
         run: python record_scores.py
+        timeout-minutes: 15
 
       - name: Commit and push
         run: |
