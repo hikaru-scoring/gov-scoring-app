@@ -115,9 +115,7 @@ def score_one(toptier_code: str, agency_list: list) -> int | None:
 
     # Axis 3: Performance
     sub_data = _fetch_json(
-        f"{API_BASE}/agency/{toptier_code}/sub_agency/",
-        method="POST",
-        payload={"fiscal_year": _current_fy(), "limit": 100, "page": 1},
+        f"{API_BASE}/agency/{toptier_code}/sub_agency/?fiscal_year={_current_fy()}",
     )
     if sub_data:
         results = sub_data.get("results", [])

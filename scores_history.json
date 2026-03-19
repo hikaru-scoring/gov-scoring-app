@@ -15,5 +15,22 @@
     "Department of Transportation": 439,
     "Department of Veterans Affairs": 434,
     "Social Security Administration": 600
+  },
+  "2026-03-19": {
+    "Department of Agriculture": 699,
+    "Department of Commerce": 352,
+    "Department of Defense": 495,
+    "Department of Education": 576,
+    "Department of Energy": 450,
+    "Department of Health and Human Services": 605,
+    "Department of Housing and Urban Development": 576,
+    "Department of Justice": 567,
+    "Department of Labor": 478,
+    "Department of the Interior": 481,
+    "Department of State": 358,
+    "Department of the Treasury": 380,
+    "Department of Transportation": 539,
+    "Department of Veterans Affairs": 534,
+    "Social Security Administration": 700
   }
 }

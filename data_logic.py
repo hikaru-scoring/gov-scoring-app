@@ -82,12 +82,10 @@ def fetch_agency_budgetary_resources(toptier_code: str) -> list[dict] | None:
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def fetch_agency_sub_components(toptier_code: str) -> dict | None:
-    """POST /api/v2/agency/{toptier_code}/sub_agency/ — sub-agency breakdown."""
+    """GET /api/v2/agency/{toptier_code}/sub_agency/ — sub-agency breakdown."""
     try:
-        payload = {"fiscal_year": _current_fy(), "limit": 100, "page": 1}
-        r = requests.post(
-            f"{API_BASE}/agency/{toptier_code}/sub_agency/",
-            json=payload,
+        r = requests.get(
+            f"{API_BASE}/agency/{toptier_code}/sub_agency/?fiscal_year={_current_fy()}",
             timeout=30,
         )
         if r.status_code != 200:
