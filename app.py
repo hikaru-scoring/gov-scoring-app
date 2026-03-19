@@ -305,12 +305,6 @@ def main():
     # AGENCY DETAIL TAB
     # ===================================================================
     with tab_agency:
-        st.markdown(
-            "<div style='font-size:1.5em; font-weight:900; color:#1e3a8a; margin-bottom:15px;'>"
-            "Agency Detail</div>",
-            unsafe_allow_html=True,
-        )
-
         # Agency selector
         agency_options = {f"{v['abbr']} — {v['name']}": k for k, v in AGENCIES.items()}
         selected_label = st.selectbox("Select Agency", list(agency_options.keys()))
@@ -328,12 +322,6 @@ def main():
                 "Outlays": _fmt_budget(data["outlay"]),
                 "% of Federal Budget": f"{data['pct_of_total']:.1f}%",
             }
-
-            # Agency name (matches FRS-1000 asset name display)
-            st.markdown(
-                f'<div style="font-size:1.1em; font-weight:700; color:#333; margin:4px 0 2px;">{data["name"]}</div>',
-                unsafe_allow_html=True
-            )
 
             # --- Buttons row (matches FRS-1000: Save | Clear | PDF | CSV) ---
             col_btn1, col_btn2, col_btn3, col_btn4, col_btn_rest = st.columns([1, 1, 1.5, 1.5, 5.5])
