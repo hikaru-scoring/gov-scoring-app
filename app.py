@@ -104,7 +104,7 @@ def generate_csv(data: dict, axes_labels: list, logic_descriptions: dict = None,
 # ---------------------------------------------------------------------------
 LOGIC_DESC = {
     "Budget Efficiency": "Outlay-to-budget x Obligation-to-budget ratios",
-    "Transparency": "Budget justification x Reporting x Data quality",
+    "Transparency": "Justification x Reporting x Data quality",
     "Performance": "Transaction volume x New award count",
     "Fiscal Discipline": "YoY budget growth x Unobligated balance ratio",
     "Accountability": "GAO audit findings (fewer = higher score)",
@@ -400,7 +400,7 @@ def main():
                                 <span style="font-size: 1.4em; font-weight: 800; color: #333333;">{axis}</span>
                                 <span style="font-size: 1.9em; font-weight: 900; line-height: 1;">{score_html}</span>
                             </div>
-                            <p style="font-size: 0.85em; color: #777777; margin: 0; line-height: 1.3; font-weight: 500;">{desc_text}</p>
+                            <p style="font-size: 1.05em; color: #777777; margin: 0; line-height: 1.3; font-weight: 500;">{desc_text}</p>
                         </div>
                         """,
                         unsafe_allow_html=True
