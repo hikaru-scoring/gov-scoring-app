@@ -104,10 +104,10 @@ def generate_csv(data: dict, axes_labels: list, logic_descriptions: dict = None,
 # ---------------------------------------------------------------------------
 LOGIC_DESC = {
     "Budget Efficiency": "Outlay-to-budget x Obligation-to-budget ratios",
-    "Transparency": "Congressional justification, sub-agency reporting, data completeness",
-    "Performance": "Transaction volume x New award count across sub-agencies",
-    "Fiscal Discipline": "YoY budget growth rate x Unobligated balance ratio",
-    "Accountability": "GAO audit finding count (fewer = higher score)",
+    "Transparency": "Justification URL x Sub-agency reporting x Completeness",
+    "Performance": "Transaction volume x New award count",
+    "Fiscal Discipline": "YoY budget growth x Unobligated balance ratio",
+    "Accountability": "GAO audit findings (fewer = higher score)",
 }
 
 
