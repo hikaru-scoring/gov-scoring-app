@@ -264,5 +264,5 @@ def score_agency(toptier_code: str) -> dict | None:
         "budget_authority": budget_auth,
         "obligated": obligated,
         "outlay": outlay,
-        "pct_of_total": agency_row.get("percentage_of_total_budget_authority", 0),
+        "pct_of_total": (agency_row.get("percentage_of_total_budget_authority") or 0) * 100,
     }
