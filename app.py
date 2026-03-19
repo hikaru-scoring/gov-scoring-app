@@ -9,6 +9,7 @@ import streamlit as st
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from data_logic import AGENCIES, AXES_LABELS, score_agency
+from state_data import STATES, STATE_AXES_LABELS, STATE_LOGIC_DESC, score_all_states, score_state, fetch_state_finances
 from ui_components import inject_css, render_radar_chart
 from pdf_report import generate_pdf
 
@@ -161,7 +162,10 @@ def main():
                                      placeholder="e.g. Acme Research LLC", key="wl_company")
 
     # Tabs
-    tab_dash, tab_agency, tab_rankings = st.tabs(["Dashboard", "Agency Detail", "Rankings"])
+    if "saved_state_data" not in st.session_state:
+        st.session_state.saved_state_data = None
+
+    tab_dash, tab_agency, tab_states, tab_rankings = st.tabs(["Dashboard", "Agency Detail", "State Scores", "Rankings"])
 
     # ===================================================================
     # DASHBOARD TAB
@@ -300,6 +304,67 @@ def main():
                     )
         else:
             st.error("Failed to load agency data. Please check your internet connection.")
+
+        # --- State Scores Map ---
+        st.markdown("<div class='section-title' style='margin-top:40px;'>State Fiscal Health Map (2023)</div>",
+                    unsafe_allow_html=True)
+
+        with st.spinner("Loading state data from Census Bureau..."):
+            state_scores = score_all_states()
+
+        if state_scores:
+            import plotly.express as px
+            abbrs = [s["abbr"] for s in state_scores]
+            totals = [s["total"] for s in state_scores]
+            names = [s["name"] for s in state_scores]
+            hovers = [f"{s['name']} ({s['abbr']}): {s['total']}/1000" for s in state_scores]
+
+            fig_map = px.choropleth(
+                locations=abbrs,
+                locationmode="USA-states",
+                color=totals,
+                color_continuous_scale=[
+                    [0, "#ef4444"],
+                    [0.4, "#f59e0b"],
+                    [0.6, "#2E7BE6"],
+                    [0.8, "#10b981"],
+                    [1.0, "#059669"],
+                ],
+                scope="usa",
+                hover_name=hovers,
+                range_color=[300, 900],
+            )
+            fig_map.update_layout(
+                geo=dict(bgcolor="rgba(0,0,0,0)", lakecolor="white"),
+                margin=dict(l=0, r=0, t=0, b=0),
+                height=500,
+                coloraxis_colorbar=dict(
+                    title="Score",
+                    tickvals=[300, 500, 700, 900],
+                    len=0.6,
+                ),
+                paper_bgcolor="white",
+            )
+            st.plotly_chart(fig_map, use_container_width=True, config={"displayModeBar": False})
+
+            # Top & Bottom 5 states
+            st_top, st_bot = st.columns(2)
+            with st_top:
+                st.markdown("<div style='font-size:1em; font-weight:700; color:#10b981; margin-bottom:10px;'>Top 5 States</div>", unsafe_allow_html=True)
+                for s in state_scores[:5]:
+                    st.markdown(f"""<div style="background:#f0fdf4; padding:8px 12px; border-radius:8px; margin-bottom:4px; display:flex; justify-content:space-between;">
+                        <span style="font-weight:600;">{s['name']}</span>
+                        <span style="font-weight:900; color:#10b981;">{s['total']}</span>
+                    </div>""", unsafe_allow_html=True)
+            with st_bot:
+                st.markdown("<div style='font-size:1em; font-weight:700; color:#ef4444; margin-bottom:10px;'>Bottom 5 States</div>", unsafe_allow_html=True)
+                for s in state_scores[-5:]:
+                    st.markdown(f"""<div style="background:#fef2f2; padding:8px 12px; border-radius:8px; margin-bottom:4px; display:flex; justify-content:space-between;">
+                        <span style="font-weight:600;">{s['name']}</span>
+                        <span style="font-weight:900; color:#ef4444;">{s['total']}</span>
+                    </div>""", unsafe_allow_html=True)
+        else:
+            st.warning("Could not load state data from Census Bureau.")
 
     # ===================================================================
     # AGENCY DETAIL TAB
@@ -454,6 +519,116 @@ def main():
             st.error("Failed to load agency data.")
 
     # ===================================================================
+    # STATE SCORES TAB
+    # ===================================================================
+    with tab_states:
+        st.markdown(
+            "<div class='company-header'>State Scores</div>",
+            unsafe_allow_html=True
+        )
+
+        state_options = {f"{v['abbr']} — {v['name']}": k for k, v in STATES.items()}
+        selected_state_label = st.selectbox("Select State", list(state_options.keys()))
+        selected_fips = state_options[selected_state_label]
+
+        with st.spinner("Loading state data..."):
+            finances = fetch_state_finances()
+            state_data = score_state(selected_fips, finances) if finances else None
+
+        if state_data:
+            total_st = state_data["total"]
+
+            # --- Buttons ---
+            st_btn1, st_btn2, st_btn_rest = st.columns([1, 1, 8])
+            with st_btn1:
+                st_save = st.button("Save", key="st_save")
+            with st_btn2:
+                st_clear = st.button("Clear", key="st_clear")
+
+            if st_save:
+                st.session_state.saved_state_data = state_data
+                st.rerun()
+            if st_clear:
+                st.session_state.saved_state_data = None
+                st.rerun()
+
+            # --- Total Score ---
+            st.markdown(f"""
+            <div style="text-align:center; margin-top:4px; margin-bottom:10px;">
+                <div style="font-size:14px; letter-spacing:2px; color:#666;">TOTAL SCORE</div>
+                <div style="font-size:90px; font-weight:800; color:#2E7BE6; line-height:1;">
+                    {total_st}
+                    <span style="font-size:35px; color:#BBB;">/ 1000</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # --- Radar + Metrics ---
+            st_col_left, st_col_right = st.columns([1.5, 1])
+
+            with st_col_left:
+                st.markdown("<div style='font-size: 1.1em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 5px;'>I. Intelligence Radar</div>", unsafe_allow_html=True)
+                fig_st = render_radar_chart(state_data, st.session_state.saved_state_data, STATE_AXES_LABELS)
+                st.plotly_chart(fig_st, use_container_width=True, config={"displayModeBar": False})
+
+            with st_col_right:
+                st.markdown(
+                    "<div style='font-size: 0.9em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 15px; border-left: 3px solid #2E7BE6; padding-left: 8px;'>II. ANALYSIS SCORE METRICS</div>",
+                    unsafe_allow_html=True
+                )
+
+                saved_st = st.session_state.saved_state_data
+                for axis in STATE_AXES_LABELS:
+                    v1 = state_data["axes"][axis]
+                    v2 = saved_st["axes"].get(axis, 0) if saved_st else None
+                    desc_text = STATE_LOGIC_DESC.get(axis, "")
+
+                    score_html = f'<span style="color: #2E7BE6;">{int(v1)}</span>'
+                    if v2 is not None:
+                        score_html += f' <span style="color: #ccc; font-size: 0.9em; font-weight:bold; margin: 0 6px;">vs</span> <span style="color: #F4A261;">{int(v2)}</span>'
+
+                    st.markdown(
+                        f"""
+                        <div style="
+                            background-color: #FFFFFF;
+                            padding: 20px;
+                            border-radius: 12px;
+                            margin-bottom: 12px;
+                            border: 1px solid #E0E0E0;
+                            border-left: 8px solid #2E7BE6;
+                            box-shadow: 2px 2px 5px rgba(0,0,0,0.07);
+                        ">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span style="font-size: 1.4em; font-weight: 800; color: #333333;">{axis}</span>
+                                <span style="font-size: 1.9em; font-weight: 900; line-height: 1;">{score_html}</span>
+                            </div>
+                            <p style="font-size: 1.05em; color: #777777; margin: 0; line-height: 1.3; font-weight: 500;">{desc_text}</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+            # --- Fiscal Snapshot ---
+            st.markdown("<div class='section-title'>III. Fiscal Snapshot</div>", unsafe_allow_html=True)
+            fs1, fs2, fs3, fs4 = st.columns(4)
+            fiscal_items = [
+                (fs1, "REVENUE", _fmt_budget(state_data["revenue"])),
+                (fs2, "EXPENDITURE", _fmt_budget(state_data["expenditure"])),
+                (fs3, "DEBT", _fmt_budget(state_data["debt"])),
+                (fs4, "RESERVES", _fmt_budget(state_data["cash_holdings"])),
+            ]
+            for col, label, value in fiscal_items:
+                col.markdown(f"""
+                <div style="background:#fff; padding:20px; border-radius:12px; text-align:center; border:1px solid #e2e8f0; box-shadow:2px 2px 5px rgba(0,0,0,0.04);">
+                    <div style="font-size:0.7em; font-weight:700; color:#94a3b8; letter-spacing:1px;">{label}</div>
+                    <div style="font-size:1.8em; font-weight:900; color:#2E7BE6; line-height:1.3;">{value}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        else:
+            st.error("Failed to load state data. Please check your internet connection.")
+
+    # ===================================================================
     # RANKINGS TAB
     # ===================================================================
     with tab_rankings:
@@ -602,8 +777,8 @@ def main():
     color:#64748b; line-height:1.6; text-align:left; border-left:4px solid #2E7BE6; max-width:600px;
     margin-left:auto; margin-right:auto;">
     <strong>DISCLAIMER:</strong> This tool is for informational and research purposes only.
-    Scores are derived from publicly available data on USASpending.gov and do not represent
-    official government assessments. All data is provided as-is without warranty.
+    Scores are derived from publicly available data on USASpending.gov and the US Census Bureau
+    and do not represent official government assessments. All data is provided as-is without warranty.
     </div>
     """, unsafe_allow_html=True)
 
