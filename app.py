@@ -374,7 +374,7 @@ def main():
             render_score_delta(data["name"], total)
 
             # --- I. Radar + II. Score Metrics ---
-            col_radar, col_axes = st.columns([1.8, 1])
+            col_radar, col_axes = st.columns([1.5, 1])
 
             with col_radar:
                 st.markdown("<div style='font-size: 1.1em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 5px;'>I. Intelligence Radar</div>", unsafe_allow_html=True)
@@ -409,10 +409,10 @@ def main():
                             box-shadow: 2px 2px 5px rgba(0,0,0,0.07);
                         ">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                                <span style="font-size: 1.2em; font-weight: 800; color: #333333;">{axis}</span>
-                                <span style="font-size: 1.7em; font-weight: 900; line-height: 1;">{score_html}</span>
+                                <span style="font-size: 1.4em; font-weight: 800; color: #333333;">{axis}</span>
+                                <span style="font-size: 1.9em; font-weight: 900; line-height: 1;">{score_html}</span>
                             </div>
-                            <p style="font-size: 0.95em; color: #777777; margin: 0; line-height: 1.3; font-weight: 500;">{desc_text}</p>
+                            <p style="font-size: 1.05em; color: #777777; margin: 0; line-height: 1.3; font-weight: 500;">{desc_text}</p>
                         </div>
                         """,
                         unsafe_allow_html=True
@@ -432,7 +432,7 @@ def main():
                 col.markdown(f"""
                 <div style="background:#fff; padding:20px; border-radius:12px; text-align:center; border:1px solid #e2e8f0; box-shadow:2px 2px 5px rgba(0,0,0,0.04);">
                     <div style="font-size:0.7em; font-weight:700; color:#94a3b8; letter-spacing:1px;">{label}</div>
-                    <div style="font-size:1.8em; font-weight:900; color:#1e293b; line-height:1.3;">{value}</div>
+                    <div style="font-size:1.8em; font-weight:900; color:#2E7BE6; line-height:1.3;">{value}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
