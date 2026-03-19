@@ -103,11 +103,11 @@ def generate_csv(data: dict, axes_labels: list, logic_descriptions: dict = None,
 # Logic descriptions for each axis
 # ---------------------------------------------------------------------------
 LOGIC_DESC = {
-    "Budget Efficiency": "Outlay-to-budget and obligation-to-budget ratios. Higher execution = higher score.",
-    "Transparency": "Congressional justification URL, sub-agency reporting count, data completeness.",
-    "Performance": "Transaction volume and new award count across sub-agencies.",
-    "Fiscal Discipline": "Year-over-year budget growth rate (lower = better) and unobligated balance ratio.",
-    "Accountability": "GAO audit finding count (fewer findings = higher score).",
+    "Budget Efficiency": "Outlay-to-budget x Obligation-to-budget ratios",
+    "Transparency": "Congressional justification, sub-agency reporting, data completeness",
+    "Performance": "Transaction volume x New award count across sub-agencies",
+    "Fiscal Discipline": "YoY budget growth rate x Unobligated balance ratio",
+    "Accountability": "GAO audit finding count (fewer = higher score)",
 }
 
 
@@ -389,18 +389,18 @@ def main():
                         f"""
                         <div style="
                             background-color: #FFFFFF;
-                            padding: 12px 16px;
-                            border-radius: 10px;
-                            margin-bottom: 6px;
+                            padding: 20px;
+                            border-radius: 12px;
+                            margin-bottom: 12px;
                             border: 1px solid #E0E0E0;
-                            border-left: 6px solid #2E7BE6;
+                            border-left: 8px solid #2E7BE6;
                             box-shadow: 2px 2px 5px rgba(0,0,0,0.07);
                         ">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
-                                <span style="font-size: 1.15em; font-weight: 800; color: #333333;">{axis}</span>
-                                <span style="font-size: 1.5em; font-weight: 900; line-height: 1;">{score_html}</span>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span style="font-size: 1.4em; font-weight: 800; color: #333333;">{axis}</span>
+                                <span style="font-size: 1.9em; font-weight: 900; line-height: 1;">{score_html}</span>
                             </div>
-                            <p style="font-size: 0.88em; color: #777777; margin: 0; line-height: 1.2; font-weight: 500;">{desc_text}</p>
+                            <p style="font-size: 1.05em; color: #777777; margin: 0; line-height: 1.3; font-weight: 500;">{desc_text}</p>
                         </div>
                         """,
                         unsafe_allow_html=True
