@@ -8,7 +8,7 @@ def inject_css():
     st.markdown("""
         <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        .block-container { max-width: 1200px; padding-top: 1rem; background-color: #FFFFFF; font-family: 'Inter', sans-serif; }
+        .block-container { max-width: 1600px; padding-top: 1rem; background-color: #FFFFFF; font-family: 'Inter', sans-serif; }
 
         .total-score-container { text-align: center; padding: 20px; margin-bottom: 20px; border-bottom: 2px solid #F0F0F0; }
         .total-score-label { font-size: 16px; color: #666; font-weight: 700; letter-spacing: 2px; }
