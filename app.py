@@ -377,14 +377,13 @@ def main():
                     [1.0, "#047857"],
                 ],
                 zmin=300, zmax=900,
-                text=hovers,
-                hoverinfo="text",
+                hoverinfo="skip",
                 colorbar=dict(title="Score", tickvals=[300, 500, 700, 900], len=0.6),
             ))
 
             # Score text on each state
             lats = [STATES[s["fips"]]["lat"] for s in state_scores]
-            lons = [STATES[s["fips"]]["lon"] + 1.5 for s in state_scores]
+            lons = [STATES[s["fips"]]["lon"] for s in state_scores]
             labels = [str(s["total"]) for s in state_scores]
 
             fig_map.add_trace(go.Scattergeo(
@@ -416,25 +415,14 @@ def main():
                 dragmode=False,
             )
             # Capture click events on map
-            map_event = st.plotly_chart(fig_map, use_container_width=True, config={
+            st.plotly_chart(fig_map, use_container_width=True, config={
                 "displayModeBar": False,
                 "scrollZoom": False,
                 "doubleClick": False,
-            }, on_select="rerun", key="state_map")
+                "staticPlot": True,
+            })
 
-            # Check if a state was clicked
-            clicked_fips = None
-            if map_event and map_event.selection and map_event.selection.points:
-                pt = map_event.selection.points[0]
-                # Choropleth click returns location (abbr)
-                clicked_abbr = pt.get("location", None)
-                if clicked_abbr:
-                    for fips, info in STATES.items():
-                        if info["abbr"] == clicked_abbr:
-                            clicked_fips = fips
-                            break
-
-            if clicked_fips:
+            if False:
                 clicked_data = score_state(clicked_fips, finances_data)
                 if clicked_data:
                     st.markdown(f"""
