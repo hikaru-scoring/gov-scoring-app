@@ -313,56 +313,92 @@ def main():
             state_scores = score_all_states()
 
         if state_scores:
-            import plotly.express as px
+            # Build score lookup for text labels
+            score_by_abbr = {s["abbr"]: s["total"] for s in state_scores}
+
             abbrs = [s["abbr"] for s in state_scores]
             totals = [s["total"] for s in state_scores]
-            names = [s["name"] for s in state_scores]
             hovers = [f"{s['name']} ({s['abbr']}): {s['total']}/1000" for s in state_scores]
 
-            fig_map = px.choropleth(
+            fig_map = go.Figure()
+
+            # Choropleth layer
+            fig_map.add_trace(go.Choropleth(
                 locations=abbrs,
                 locationmode="USA-states",
-                color=totals,
-                color_continuous_scale=[
+                z=totals,
+                colorscale=[
                     [0, "#ef4444"],
                     [0.4, "#f59e0b"],
                     [0.6, "#2E7BE6"],
                     [0.8, "#10b981"],
                     [1.0, "#059669"],
                 ],
-                scope="usa",
-                hover_name=hovers,
-                range_color=[300, 900],
-            )
+                zmin=300, zmax=900,
+                text=hovers,
+                hoverinfo="text",
+                colorbar=dict(title="Score", tickvals=[300, 500, 700, 900], len=0.6),
+            ))
+
+            # Score text on each state
+            lats = [STATES[s["fips"]]["lat"] for s in state_scores]
+            lons = [STATES[s["fips"]]["lon"] for s in state_scores]
+            labels = [str(s["total"]) for s in state_scores]
+
+            fig_map.add_trace(go.Scattergeo(
+                locationmode="USA-states",
+                lat=lats,
+                lon=lons,
+                text=labels,
+                mode="text",
+                textfont=dict(size=9, color="white", family="Arial Black"),
+                hoverinfo="skip",
+                showlegend=False,
+            ))
+
             fig_map.update_layout(
-                geo=dict(bgcolor="rgba(0,0,0,0)", lakecolor="white"),
+                geo=dict(
+                    scope="usa",
+                    bgcolor="rgba(0,0,0,0)",
+                    lakecolor="white",
+                ),
                 margin=dict(l=0, r=0, t=0, b=0),
                 height=500,
-                coloraxis_colorbar=dict(
-                    title="Score",
-                    tickvals=[300, 500, 700, 900],
-                    len=0.6,
-                ),
                 paper_bgcolor="white",
+                dragmode=False,
             )
-            st.plotly_chart(fig_map, use_container_width=True, config={"displayModeBar": False})
+            st.plotly_chart(fig_map, use_container_width=True, config={
+                "displayModeBar": False,
+                "scrollZoom": False,
+                "doubleClick": False,
+            })
 
-            # Top & Bottom 5 states
-            st_top, st_bot = st.columns(2)
-            with st_top:
-                st.markdown("<div style='font-size:1em; font-weight:700; color:#10b981; margin-bottom:10px;'>Top 5 States</div>", unsafe_allow_html=True)
-                for s in state_scores[:5]:
-                    st.markdown(f"""<div style="background:#f0fdf4; padding:8px 12px; border-radius:8px; margin-bottom:4px; display:flex; justify-content:space-between;">
-                        <span style="font-weight:600;">{s['name']}</span>
-                        <span style="font-weight:900; color:#10b981;">{s['total']}</span>
-                    </div>""", unsafe_allow_html=True)
-            with st_bot:
-                st.markdown("<div style='font-size:1em; font-weight:700; color:#ef4444; margin-bottom:10px;'>Bottom 5 States</div>", unsafe_allow_html=True)
-                for s in state_scores[-5:]:
-                    st.markdown(f"""<div style="background:#fef2f2; padding:8px 12px; border-radius:8px; margin-bottom:4px; display:flex; justify-content:space-between;">
-                        <span style="font-weight:600;">{s['name']}</span>
-                        <span style="font-weight:900; color:#ef4444;">{s['total']}</span>
-                    </div>""", unsafe_allow_html=True)
+            # All states ranking
+            st.markdown("<div style='font-size:1em; font-weight:700; color:#1e3a8a; margin-top:20px; margin-bottom:10px;'>ALL STATES</div>", unsafe_allow_html=True)
+            st_cols = st.columns(3)
+            for idx, s in enumerate(state_scores):
+                score = s["total"]
+                if score >= 700:
+                    border_color = "#10b981"
+                elif score >= 550:
+                    border_color = "#2E7BE6"
+                elif score >= 400:
+                    border_color = "#f59e0b"
+                else:
+                    border_color = "#ef4444"
+                with st_cols[idx % 3]:
+                    st.markdown(
+                        f"""<div style="background:#fff; border-radius:12px; padding:14px; margin-bottom:10px;
+                        border-left:4px solid {border_color}; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                        <div style="font-size:0.75em; color:#94a3b8; font-weight:600;">{s['abbr']}</div>
+                        <div style="font-size:0.95em; font-weight:700; color:#1e293b; margin:2px 0;">
+                        {s['name']}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                        <span style="font-size:1.8em; font-weight:900; color:{border_color};">{score}</span>
+                        <span style="font-size:0.8em; color:#94a3b8;">{_fmt_budget(s['revenue'])}</span>
+                        </div></div>""",
+                        unsafe_allow_html=True,
+                    )
         else:
             st.warning("Could not load state data from Census Bureau.")
 
