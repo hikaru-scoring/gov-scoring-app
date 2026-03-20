@@ -350,8 +350,14 @@ def main():
                 lat=lats,
                 lon=lons,
                 text=labels,
-                mode="text",
-                textfont=dict(size=9, color="white", family="Arial Black"),
+                mode="markers+text",
+                marker=dict(
+                    size=28,
+                    color="white",
+                    opacity=0.85,
+                    line=dict(width=0),
+                ),
+                textfont=dict(size=9, color="#1e293b", family="Arial Black"),
                 hoverinfo="skip",
                 showlegend=False,
             ))
