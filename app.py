@@ -353,7 +353,7 @@ def main():
 
             abbrs = [s["abbr"] for s in state_scores]
             totals = [s["total"] for s in state_scores]
-            hovers = [f"{s['name']} ({s['abbr']}): {s['total']}/1000" for s in state_scores]
+            hovers = [f"{s['name']} ({s['abbr']})" for s in state_scores]
 
             fig_map = go.Figure()
 
@@ -394,12 +394,12 @@ def main():
                 text=labels,
                 mode="markers+text",
                 marker=dict(
-                    size=28,
+                    size=32,
                     color="white",
                     opacity=0.85,
                     line=dict(width=0),
                 ),
-                textfont=dict(size=9, color="#1e293b", family="Arial Black"),
+                textfont=dict(size=10, color="#1e293b", family="Arial Black"),
                 hoverinfo="skip",
                 showlegend=False,
             ))
