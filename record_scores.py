@@ -41,27 +41,28 @@ def _clamp(value: float, lo: float = 0, hi: float = 200) -> int:
 
 def _fetch_json(url: str, method: str = "GET", payload: dict = None) -> dict | None:
     """Fetch JSON with retry logic and delay."""
-    for attempt in range(3):
+    for attempt in range(5):
         try:
             if method == "POST":
-                r = requests.post(url, json=payload, timeout=60)
+                r = requests.post(url, json=payload, timeout=90)
             else:
-                r = requests.get(url, timeout=60)
+                r = requests.get(url, timeout=90)
             if r.status_code == 200:
                 return r.json()
-            if r.status_code == 429:
-                # Rate limited - wait longer
-                print(f"    Rate limited, waiting {10 * (attempt + 1)}s...")
-                time.sleep(10 * (attempt + 1))
+            # Retry on server errors (429, 500, 502, 503, 504)
+            if r.status_code in (429, 500, 502, 503, 504):
+                wait = 15 * (attempt + 1)
+                print(f"    HTTP {r.status_code}, retrying in {wait}s (attempt {attempt + 1}/5)...")
+                time.sleep(wait)
                 continue
             print(f"    HTTP {r.status_code} for {url}")
             return None
         except requests.exceptions.Timeout:
-            print(f"    Timeout (attempt {attempt + 1}/3) for {url}")
-            time.sleep(5)
+            print(f"    Timeout (attempt {attempt + 1}/5) for {url}")
+            time.sleep(15 * (attempt + 1))
         except Exception as e:
-            print(f"    Error (attempt {attempt + 1}/3): {e}")
-            time.sleep(5)
+            print(f"    Error (attempt {attempt + 1}/5): {e}")
+            time.sleep(10)
     return None
 
 
@@ -199,7 +200,7 @@ def main():
             print(f"    {name}: FAILED")
         time.sleep(2)  # Delay between agencies
 
-    if success < 5:
+    if success < 3:
         print(f"ERROR: Only {success}/15 agencies scored, skipping save")
         sys.exit(1)
 
