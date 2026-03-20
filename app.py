@@ -2,9 +2,12 @@
 """GOV-1000 — US Government Agency Scoring Platform."""
 import json
 import os
+import xml.etree.ElementTree as ET
+from urllib.parse import quote
 
 import pandas as pd
 import plotly.graph_objects as go
+import requests
 import streamlit as st
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -110,6 +113,37 @@ LOGIC_DESC = {
     "Fiscal Discipline": "YoY budget growth x Unobligated balance ratio",
     "Accountability": "GAO audit findings (fewer = higher score)",
 }
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def fetch_gov_news(query: str, max_items: int = 5) -> list[dict]:
+    """Fetch news from Google News RSS for a given query."""
+    try:
+        url = f"https://news.google.com/rss/search?q={quote(query)}+US+government&hl=en-US&gl=US&ceid=US:en"
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        root = ET.fromstring(r.content)
+        items = root.findall(".//item")
+        results = []
+        for item in items[:max_items]:
+            title = item.findtext("title", "")
+            link = item.findtext("link", "")
+            source = item.findtext("source", "")
+            pub_date = item.findtext("pubDate", "")
+            if pub_date:
+                try:
+                    from email.utils import parsedate_to_datetime
+                    dt = parsedate_to_datetime(pub_date)
+                    pub_str = dt.strftime("%b %d, %Y")
+                except Exception:
+                    pub_str = pub_date[:16]
+            else:
+                pub_str = ""
+            if title and link:
+                results.append({"title": title, "link": link, "publisher": source, "date": pub_str})
+        return results
+    except Exception:
+        return []
 
 
 def _fmt_budget(amount: float) -> str:
@@ -661,6 +695,21 @@ def main():
             worst1 = min(axes1, key=axes1.get) if axes1 else "N/A"
             worst1_val = int(axes1.get(worst1, 0))
             sc3.markdown(f'<div class="card"><div style="font-size:11px; color:#999;">WEAKEST</div><div style="font-size:18px; font-weight:900;"><span style="color:#ef4444;">{worst1} ({worst1_val})</span></div></div>', unsafe_allow_html=True)
+
+            # --- VII. Latest News ---
+            st.markdown("<div class='section-title'>VII. Latest News</div>", unsafe_allow_html=True)
+            news_items = fetch_gov_news(data["name"])
+            if news_items:
+                for item in news_items:
+                    st.markdown(
+                        f'<div style="padding:10px 0; border-bottom:1px solid #F0F0F0;">'
+                        f'<a href="{item["link"]}" target="_blank" style="font-size:0.95em; font-weight:600; color:#1e3a8a; text-decoration:none;">{item["title"]}</a>'
+                        f'<div style="font-size:0.8em; color:#999; margin-top:3px;">{item["publisher"]} · {item["date"]}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.caption("No recent news available.")
         else:
             st.error("Failed to load agency data.")
 
@@ -832,6 +881,21 @@ def main():
                 st.plotly_chart(fig_re, use_container_width=True, config={"displayModeBar": False})
             else:
                 st.info("Historical data not available.")
+
+            # --- VI. Latest News ---
+            st.markdown("<div class='section-title'>VI. Latest News</div>", unsafe_allow_html=True)
+            state_news = fetch_gov_news(f"{state_data['name']} state budget")
+            if state_news:
+                for item in state_news:
+                    st.markdown(
+                        f'<div style="padding:10px 0; border-bottom:1px solid #F0F0F0;">'
+                        f'<a href="{item["link"]}" target="_blank" style="font-size:0.95em; font-weight:600; color:#1e3a8a; text-decoration:none;">{item["title"]}</a>'
+                        f'<div style="font-size:0.8em; color:#999; margin-top:3px;">{item["publisher"]} · {item["date"]}</div>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+            else:
+                st.caption("No recent news available.")
 
         else:
             st.error("Failed to load state data. Please check your internet connection.")
