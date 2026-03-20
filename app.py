@@ -419,17 +419,28 @@ def main():
             fig_map.update_geos(
                 projection_type="albers usa",
             )
-            st.plotly_chart(fig_map, use_container_width=True, config={
+            map_event = st.plotly_chart(fig_map, use_container_width=True, config={
                 "displayModeBar": False,
                 "scrollZoom": False,
                 "doubleClick": False,
-                "dragMode": False,
-            })
+            }, on_select="rerun", key="state_map")
 
-            # State detail selector below map
-            dash_state_options = {f"{v['abbr']} — {v['name']}": k for k, v in STATES.items()}
-            dash_selected_label = st.selectbox("Select State", list(dash_state_options.keys()), key="dash_state_select")
-            dash_selected_fips = dash_state_options[dash_selected_label]
+            # Detect clicked state from map
+            clicked_fips = None
+            if map_event and map_event.selection and map_event.selection.points:
+                pt = map_event.selection.points[0]
+                clicked_abbr = pt.get("location", None)
+                if clicked_abbr:
+                    for fips, info in STATES.items():
+                        if info["abbr"] == clicked_abbr:
+                            clicked_fips = fips
+                            break
+
+            # Store in session state so it persists
+            if clicked_fips:
+                st.session_state["dash_selected_fips"] = clicked_fips
+
+            dash_selected_fips = st.session_state.get("dash_selected_fips", list(STATES.keys())[0])
             dash_state_data = score_state(dash_selected_fips, finances_data)
 
             if dash_state_data:
