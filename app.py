@@ -8,8 +8,8 @@ import plotly.graph_objects as go
 import streamlit as st
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from data_logic import AGENCIES, AXES_LABELS, score_agency
-from state_data import STATES, STATE_AXES_LABELS, STATE_LOGIC_DESC, score_all_states, score_state, fetch_state_finances
+from data_logic import AGENCIES, AXES_LABELS, score_agency, fetch_agency_budgetary_resources
+from state_data import STATES, STATE_AXES_LABELS, STATE_LOGIC_DESC, score_all_states, score_state, fetch_state_finances, fetch_state_score_history
 from ui_components import inject_css, render_radar_chart
 from pdf_report import generate_pdf
 
@@ -601,13 +601,47 @@ def main():
                 </div>
                 """, unsafe_allow_html=True)
 
-            # --- IV. Daily Score Tracker ---
-            st.markdown("<div class='section-title'>IV. Daily Score Tracker</div>",
+            # --- IV. Budget History ---
+            st.markdown("<div class='section-title'>IV. Budget History</div>",
+                        unsafe_allow_html=True)
+            budget_history = fetch_agency_budgetary_resources(selected_code)
+            if budget_history:
+                sorted_bh = sorted(budget_history, key=lambda x: x.get("fiscal_year", 0))
+                bh_years = [h["fiscal_year"] for h in sorted_bh if h.get("fiscal_year")]
+                bh_budget = [h.get("agency_budgetary_resources", 0) for h in sorted_bh if h.get("fiscal_year")]
+                bh_obligated = [h.get("agency_total_obligated", 0) for h in sorted_bh if h.get("fiscal_year")]
+
+                fig_bh = go.Figure()
+                fig_bh.add_trace(go.Scatter(
+                    x=bh_years, y=bh_budget,
+                    mode="lines+markers", name="Budget Authority",
+                    line=dict(color="#2E7BE6", width=3),
+                    marker=dict(size=8),
+                ))
+                fig_bh.add_trace(go.Scatter(
+                    x=bh_years, y=bh_obligated,
+                    mode="lines+markers", name="Obligated",
+                    line=dict(color="#10b981", width=3),
+                    marker=dict(size=8),
+                ))
+                fig_bh.update_layout(
+                    height=350,
+                    margin=dict(l=0, r=0, t=10, b=0),
+                    plot_bgcolor="white",
+                    yaxis=dict(gridcolor="#f0f0f0", tickformat="$.2s"),
+                    xaxis=dict(gridcolor="#f0f0f0", dtick=1),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    dragmode=False,
+                )
+                st.plotly_chart(fig_bh, use_container_width=True, config={"displayModeBar": False})
+
+            # --- V. Daily Score Tracker ---
+            st.markdown("<div class='section-title'>V. Daily Score Tracker</div>",
                         unsafe_allow_html=True)
             render_daily_score_tracker(data["name"])
 
-            # --- V. Score Comparison ---
-            st.markdown("<div class='section-title'>V. Score Comparison</div>",
+            # --- VI. Score Comparison ---
+            st.markdown("<div class='section-title'>VI. Score Comparison</div>",
                         unsafe_allow_html=True)
 
             sc1, sc2, sc3 = st.columns(3)
@@ -736,6 +770,68 @@ def main():
                     <div style="font-size:1.8em; font-weight:900; color:#2E7BE6; line-height:1.3;">{value}</div>
                 </div>
                 """, unsafe_allow_html=True)
+
+            # --- IV. Score History (2017-2023) ---
+            st.markdown("<div class='section-title'>IV. GOV-1000 Score History (2017–2023)</div>",
+                        unsafe_allow_html=True)
+            with st.spinner("Computing historical scores..."):
+                history = fetch_state_score_history(selected_fips)
+
+            if history and len(history) > 1:
+                h_years = [h["year"] for h in history]
+                h_totals = [h["total"] for h in history]
+
+                fig_sh = go.Figure()
+                fig_sh.add_trace(go.Scatter(
+                    x=h_years, y=h_totals,
+                    mode="lines+markers", name="GOV-1000 Score",
+                    line=dict(color="#2E7BE6", width=3),
+                    marker=dict(size=10),
+                    fill="tozeroy",
+                    fillcolor="rgba(46,123,230,0.1)",
+                ))
+                fig_sh.update_layout(
+                    height=350,
+                    margin=dict(l=0, r=0, t=10, b=0),
+                    plot_bgcolor="white",
+                    yaxis=dict(gridcolor="#f0f0f0", range=[0, 1000], dtick=200),
+                    xaxis=dict(gridcolor="#f0f0f0", dtick=1),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    dragmode=False,
+                )
+                st.plotly_chart(fig_sh, use_container_width=True, config={"displayModeBar": False})
+
+                # Revenue vs Expenditure history
+                st.markdown("<div class='section-title'>V. Revenue vs Expenditure (2017–2023)</div>",
+                            unsafe_allow_html=True)
+                h_rev = [h["revenue"] for h in history]
+                h_exp = [h["expenditure"] for h in history]
+
+                fig_re = go.Figure()
+                fig_re.add_trace(go.Scatter(
+                    x=h_years, y=h_rev,
+                    mode="lines+markers", name="Revenue",
+                    line=dict(color="#2E7BE6", width=3),
+                    marker=dict(size=8),
+                ))
+                fig_re.add_trace(go.Scatter(
+                    x=h_years, y=h_exp,
+                    mode="lines+markers", name="Expenditure",
+                    line=dict(color="#ef4444", width=3),
+                    marker=dict(size=8),
+                ))
+                fig_re.update_layout(
+                    height=350,
+                    margin=dict(l=0, r=0, t=10, b=0),
+                    plot_bgcolor="white",
+                    yaxis=dict(gridcolor="#f0f0f0", tickformat="$.2s"),
+                    xaxis=dict(gridcolor="#f0f0f0", dtick=1),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    dragmode=False,
+                )
+                st.plotly_chart(fig_re, use_container_width=True, config={"displayModeBar": False})
+            else:
+                st.info("Historical data not available.")
 
         else:
             st.error("Failed to load state data. Please check your internet connection.")

@@ -295,3 +295,40 @@ def score_all_states(year: int = 2023) -> list[dict] | None:
 
     results.sort(key=lambda s: s["total"], reverse=True)
     return results
+
+
+# ---------------------------------------------------------------------------
+# State score history (2017–2023)
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def fetch_state_score_history(fips_code: str) -> list[dict] | None:
+    """Compute GOV-1000 score for a single state across all available years.
+
+    Returns list of {"year": int, "total": int, "axes": {...}} sorted by year,
+    or None on failure.
+    """
+    if fips_code not in STATES:
+        return None
+
+    history = []
+    for year in range(2017, 2024):
+        finances = fetch_state_finances(year)
+        if finances is None:
+            continue
+        scored = score_state(fips_code, finances)
+        if scored is None:
+            continue
+        history.append({
+            "year": year,
+            "total": scored["total"],
+            "axes": scored["axes"],
+            "revenue": scored["revenue"],
+            "expenditure": scored["expenditure"],
+            "debt": scored["debt"],
+        })
+
+    if not history:
+        return None
+    history.sort(key=lambda h: h["year"])
+    return history
