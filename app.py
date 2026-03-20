@@ -415,10 +415,21 @@ def main():
                 paper_bgcolor="white",
                 dragmode=False,
             )
-            # Capture click events on map
-            fig_map.update_layout(
-                dragmode=False,
-            )
+            # Block drag on geo map via CSS, allow clicks
+            st.markdown("""
+            <style>
+            [data-testid="stPlotlyChart"] .geo .draglayer {
+                pointer-events: none !important;
+            }
+            [data-testid="stPlotlyChart"] .geo .choropleth {
+                pointer-events: all !important;
+            }
+            [data-testid="stPlotlyChart"] .geo .scattergeo {
+                pointer-events: none !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+
             fig_map.update_geos(
                 projection_type="albers usa",
             )
