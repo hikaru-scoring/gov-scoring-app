@@ -416,6 +416,9 @@ def main():
                 dragmode=False,
             )
             # Capture click events on map
+            fig_map.update_layout(
+                dragmode=False,
+            )
             fig_map.update_geos(
                 projection_type="albers usa",
             )
