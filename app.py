@@ -426,61 +426,63 @@ def main():
                 "dragMode": False,
             })
 
-            if False:
-                clicked_data = score_state(clicked_fips, finances_data)
-                if clicked_data:
-                    st.markdown(f"""
-                    <div style="text-align:center; margin:10px 0;">
-                        <div style="font-size:14px; letter-spacing:2px; color:#666;">
-                            {clicked_data['name']} ({clicked_data['abbr']})
-                        </div>
-                        <div style="font-size:70px; font-weight:800; color:#2E7BE6; line-height:1;">
-                            {clicked_data['total']}
-                            <span style="font-size:28px; color:#BBB;">/ 1000</span>
-                        </div>
+            # State detail selector below map
+            dash_state_options = {f"{v['abbr']} — {v['name']}": k for k, v in STATES.items()}
+            dash_selected_label = st.selectbox("Select State", list(dash_state_options.keys()), key="dash_state_select")
+            dash_selected_fips = dash_state_options[dash_selected_label]
+            dash_state_data = score_state(dash_selected_fips, finances_data)
+
+            if dash_state_data:
+                st.markdown(f"""
+                <div style="text-align:center; margin:10px 0;">
+                    <div style="font-size:14px; letter-spacing:2px; color:#666;">
+                        {dash_state_data['name']} ({dash_state_data['abbr']})
                     </div>
-                    """, unsafe_allow_html=True)
+                    <div style="font-size:70px; font-weight:800; color:#2E7BE6; line-height:1;">
+                        {dash_state_data['total']}
+                        <span style="font-size:28px; color:#BBB;">/ 1000</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
-                    # Radar + Metrics inline
-                    cl_left, cl_right = st.columns([1.5, 1])
-                    with cl_left:
-                        st.markdown("<div style='font-size:1.1em; font-weight:bold; color:#333; margin-bottom:5px;'>Intelligence Radar</div>", unsafe_allow_html=True)
-                        fig_cl = render_radar_chart(clicked_data, None, STATE_AXES_LABELS)
-                        st.plotly_chart(fig_cl, use_container_width=True, config={"displayModeBar": False})
-                    with cl_right:
-                        st.markdown(
-                            "<div style='font-size:0.9em; font-weight:bold; color:#333; margin-bottom:15px; border-left:3px solid #2E7BE6; padding-left:8px;'>SCORE METRICS</div>",
-                            unsafe_allow_html=True
-                        )
-                        for axis in STATE_AXES_LABELS:
-                            v = clicked_data["axes"][axis]
-                            desc = STATE_LOGIC_DESC.get(axis, "")
-                            st.markdown(f"""
-                            <div style="background:#fff; padding:16px; border-radius:12px; margin-bottom:10px;
-                                border:1px solid #e0e0e0; border-left:8px solid #2E7BE6; box-shadow:2px 2px 5px rgba(0,0,0,0.07);">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                    <span style="font-size:1.3em; font-weight:800; color:#333;">{axis}</span>
-                                    <span style="font-size:1.7em; font-weight:900; color:#2E7BE6;">{int(v)}</span>
-                                </div>
-                                <p style="font-size:1em; color:#777; margin:0;">{desc}</p>
-                            </div>""", unsafe_allow_html=True)
-
-                    # Fiscal Snapshot
-                    fs1, fs2, fs3, fs4 = st.columns(4)
-                    for col, label, val in [
-                        (fs1, "REVENUE", _fmt_budget(clicked_data["revenue"])),
-                        (fs2, "EXPENDITURE", _fmt_budget(clicked_data["expenditure"])),
-                        (fs3, "DEBT", _fmt_budget(clicked_data["debt"])),
-                        (fs4, "RESERVES", _fmt_budget(clicked_data["cash_holdings"])),
-                    ]:
-                        col.markdown(f"""
-                        <div style="background:#fff; padding:16px; border-radius:12px; text-align:center;
-                            border:1px solid #e2e8f0; box-shadow:2px 2px 5px rgba(0,0,0,0.04);">
-                            <div style="font-size:0.7em; font-weight:700; color:#94a3b8; letter-spacing:1px;">{label}</div>
-                            <div style="font-size:1.5em; font-weight:900; color:#2E7BE6; line-height:1.3;">{val}</div>
+                cl_left, cl_right = st.columns([1.5, 1])
+                with cl_left:
+                    st.markdown("<div style='font-size:1.1em; font-weight:bold; color:#333; margin-bottom:5px;'>Intelligence Radar</div>", unsafe_allow_html=True)
+                    fig_cl = render_radar_chart(dash_state_data, None, STATE_AXES_LABELS)
+                    st.plotly_chart(fig_cl, use_container_width=True, config={"displayModeBar": False})
+                with cl_right:
+                    st.markdown(
+                        "<div style='font-size:0.9em; font-weight:bold; color:#333; margin-bottom:15px; border-left:3px solid #2E7BE6; padding-left:8px;'>SCORE METRICS</div>",
+                        unsafe_allow_html=True
+                    )
+                    for axis in STATE_AXES_LABELS:
+                        v = dash_state_data["axes"][axis]
+                        desc = STATE_LOGIC_DESC.get(axis, "")
+                        st.markdown(f"""
+                        <div style="background:#fff; padding:16px; border-radius:12px; margin-bottom:10px;
+                            border:1px solid #e0e0e0; border-left:8px solid #2E7BE6; box-shadow:2px 2px 5px rgba(0,0,0,0.07);">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <span style="font-size:1.3em; font-weight:800; color:#333;">{axis}</span>
+                                <span style="font-size:1.7em; font-weight:900; color:#2E7BE6;">{int(v)}</span>
+                            </div>
+                            <p style="font-size:1em; color:#777; margin:0;">{desc}</p>
                         </div>""", unsafe_allow_html=True)
 
-                    st.markdown("---")
+                fs1, fs2, fs3, fs4 = st.columns(4)
+                for col, label, val in [
+                    (fs1, "REVENUE", _fmt_budget(dash_state_data["revenue"])),
+                    (fs2, "EXPENDITURE", _fmt_budget(dash_state_data["expenditure"])),
+                    (fs3, "DEBT", _fmt_budget(dash_state_data["debt"])),
+                    (fs4, "RESERVES", _fmt_budget(dash_state_data["cash_holdings"])),
+                ]:
+                    col.markdown(f"""
+                    <div style="background:#fff; padding:16px; border-radius:12px; text-align:center;
+                        border:1px solid #e2e8f0; box-shadow:2px 2px 5px rgba(0,0,0,0.04);">
+                        <div style="font-size:0.7em; font-weight:700; color:#94a3b8; letter-spacing:1px;">{label}</div>
+                        <div style="font-size:1.5em; font-weight:900; color:#2E7BE6; line-height:1.3;">{val}</div>
+                    </div>""", unsafe_allow_html=True)
+
+                st.markdown("---")
 
             # All states ranking
             st.markdown("<div style='font-size:1em; font-weight:700; color:#1e3a8a; margin-top:20px; margin-bottom:10px;'>ALL STATES</div>", unsafe_allow_html=True)
