@@ -377,7 +377,8 @@ def main():
                     [1.0, "#047857"],
                 ],
                 zmin=300, zmax=900,
-                hoverinfo="skip",
+                text=hovers,
+                hoverinfo="text",
                 colorbar=dict(title="Score", tickvals=[300, 500, 700, 900], len=0.6),
             ))
 
@@ -415,11 +416,14 @@ def main():
                 dragmode=False,
             )
             # Capture click events on map
+            fig_map.update_geos(
+                projection_type="albers usa",
+            )
             st.plotly_chart(fig_map, use_container_width=True, config={
                 "displayModeBar": False,
                 "scrollZoom": False,
                 "doubleClick": False,
-                "staticPlot": True,
+                "dragMode": False,
             })
 
             if False:
