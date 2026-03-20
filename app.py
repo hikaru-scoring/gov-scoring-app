@@ -384,7 +384,7 @@ def main():
 
             # Score text on each state
             lats = [STATES[s["fips"]]["lat"] for s in state_scores]
-            lons = [STATES[s["fips"]]["lon"] for s in state_scores]
+            lons = [STATES[s["fips"]]["lon"] + 1.5 for s in state_scores]
             labels = [str(s["total"]) for s in state_scores]
 
             fig_map.add_trace(go.Scattergeo(
