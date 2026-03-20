@@ -497,9 +497,9 @@ def main():
                 score = s["total"]
                 if score >= 700:
                     border_color = "#10b981"
-                elif score >= 550:
+                elif score >= 500:
                     border_color = "#2E7BE6"
-                elif score >= 400:
+                elif score >= 300:
                     border_color = "#f59e0b"
                 else:
                     border_color = "#ef4444"
