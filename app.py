@@ -474,7 +474,7 @@ def main():
                 with cl_left:
                     st.markdown("<div style='font-size:1.1em; font-weight:bold; color:#333; margin-bottom:5px;'>Intelligence Radar</div>", unsafe_allow_html=True)
                     fig_cl = render_radar_chart(dash_state_data, None, STATE_AXES_LABELS)
-                    st.plotly_chart(fig_cl, use_container_width=True, config={"displayModeBar": False})
+                    st.plotly_chart(fig_cl, use_container_width=True, config={"displayModeBar": False}, key="radar_dash_state")
                 with cl_right:
                     st.markdown(
                         "<div style='font-size:0.9em; font-weight:bold; color:#333; margin-bottom:15px; border-left:3px solid #2E7BE6; padding-left:8px;'>SCORE METRICS</div>",
@@ -604,7 +604,7 @@ def main():
             with col_radar:
                 st.markdown("<div style='font-size: 1.1em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 5px;'>I. Intelligence Radar</div>", unsafe_allow_html=True)
                 fig = render_radar_chart(data, st.session_state.saved_agency_data, AXES_LABELS)
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False}, key="radar_agency")
 
             with col_axes:
                 st.markdown(
@@ -790,7 +790,7 @@ def main():
             with st_col_left:
                 st.markdown("<div style='font-size: 1.1em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 5px;'>I. Intelligence Radar</div>", unsafe_allow_html=True)
                 fig_st = render_radar_chart(state_data, st.session_state.saved_state_data, STATE_AXES_LABELS)
-                st.plotly_chart(fig_st, use_container_width=True, config={"displayModeBar": False})
+                st.plotly_chart(fig_st, use_container_width=True, config={"displayModeBar": False}, key="radar_state")
 
             with st_col_right:
                 st.markdown(
