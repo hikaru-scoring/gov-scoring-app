@@ -573,7 +573,7 @@ def main():
                 )
 
             # --- Case Study: Can GOV-1000 predict credit downgrades? ---
-            st.markdown("<div class='section-title'>Case Study: Can GOV-1000 Predict Credit Downgrades?</div>", unsafe_allow_html=True)
+            st.markdown("<div class='section-title'>GOV-1000 Score vs Credit Rating History</div>", unsafe_allow_html=True)
 
             _case_study_data = {
                 "Illinois (A-)":     {"fips": "17", "color": "#ef4444", "dash": None},
@@ -624,8 +624,8 @@ def main():
                     <div style="font-weight:700; color:#1e3a8a; margin-bottom:8px;">Key Findings</div>
                     <ul style="color:#334155; font-size:0.9em; margin:0; padding-left:20px; line-height:1.8;">
                         <li><strong>Texas (AAA)</strong> consistently scores highest — aligns with top credit rating</li>
-                        <li><strong>Illinois 2021 spike</strong> detected fiscal recovery 2 years before S&P upgraded (2023)</li>
-                        <li><strong>New Jersey scores below Illinois</strong> despite being rated higher by S&P (A+ vs A-) — GOV-1000 may detect fiscal stress that rating agencies have not yet reflected</li>
+                        <li><strong>Illinois 2021 spike</strong> correlates with fiscal recovery from federal relief; S&P upgraded in 2023</li>
+                        <li><strong>New Jersey scores below Illinois</strong> despite higher S&P rating (A+ vs A-) — an interesting divergence worth monitoring</li>
                     </ul>
                     <p style="color:#64748b; font-size:0.8em; margin:10px 0 0 0;">
                         Credit ratings sourced from publicly available S&P reports. This tool is not affiliated with S&P Global.
