@@ -566,8 +566,9 @@ def main():
 
                 st.markdown(
                     "<p style='font-size:0.85em; color:#64748b; margin-top:-10px;'>"
-                    "States with higher GOV-1000 scores tend to have better S&P credit ratings. "
-                    "Data: S&P Global Ratings (2024–2025), Census Bureau (2023).</p>",
+                    "States with higher GOV-1000 scores tend to have better credit ratings. "
+                    "Credit ratings sourced from publicly available S&P reports. "
+                    "This tool is not affiliated with S&P Global. Fiscal data: Census Bureau (2023).</p>",
                     unsafe_allow_html=True
                 )
 
