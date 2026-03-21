@@ -572,6 +572,69 @@ def main():
                     unsafe_allow_html=True
                 )
 
+            # --- Case Study: Can GOV-1000 predict credit downgrades? ---
+            st.markdown("<div class='section-title'>Case Study: Can GOV-1000 Predict Credit Downgrades?</div>", unsafe_allow_html=True)
+
+            _case_study_data = {
+                "Illinois (A-)":     {"fips": "17", "color": "#ef4444", "dash": None},
+                "New Jersey (A+)":   {"fips": "34", "color": "#f59e0b", "dash": "dash"},
+                "Texas (AAA)":       {"fips": "48", "color": "#10b981", "dash": None},
+            }
+
+            fig_case = go.Figure()
+            _case_loaded = True
+            for label, info in _case_study_data.items():
+                hist = fetch_state_score_history(info["fips"])
+                if hist:
+                    years = [h["year"] for h in hist]
+                    totals = [h["total"] for h in hist]
+                    fig_case.add_trace(go.Scatter(
+                        x=years, y=totals, mode="lines+markers",
+                        name=label,
+                        line=dict(color=info["color"], width=3, dash=info["dash"]),
+                        marker=dict(size=8),
+                    ))
+                else:
+                    _case_loaded = False
+
+            if _case_loaded:
+                # Add rating event annotations
+                fig_case.add_vline(x=2017, line_dash="dot", line_color="#94a3b8", line_width=1)
+                fig_case.add_annotation(x=2017, y=780, text="IL rated BBB-<br>(near junk)", showarrow=False,
+                                        font=dict(size=10, color="#ef4444"), bgcolor="white", bordercolor="#ef4444", borderwidth=1)
+                fig_case.add_vline(x=2021, line_dash="dot", line_color="#94a3b8", line_width=1)
+                fig_case.add_annotation(x=2021, y=530, text="Federal COVID<br>relief funds", showarrow=False,
+                                        font=dict(size=10, color="#2E7BE6"), bgcolor="white", bordercolor="#2E7BE6", borderwidth=1)
+
+                fig_case.update_layout(
+                    xaxis=dict(title="Year", dtick=1, gridcolor="#f0f0f0"),
+                    yaxis=dict(title="GOV-1000 Score", range=[480, 830], gridcolor="#f0f0f0"),
+                    height=420,
+                    margin=dict(l=60, r=20, t=20, b=60),
+                    plot_bgcolor="white",
+                    paper_bgcolor="white",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5),
+                    clickmode="none",
+                    dragmode=False,
+                )
+                st.plotly_chart(fig_case, use_container_width=True, config={"displayModeBar": False, "staticPlot": True}, key="case_study")
+
+                st.markdown("""
+                <div style="background:#f8fafc; padding:16px; border-radius:10px; border-left:4px solid #2E7BE6; margin-bottom:20px;">
+                    <div style="font-weight:700; color:#1e3a8a; margin-bottom:8px;">Key Findings</div>
+                    <ul style="color:#334155; font-size:0.9em; margin:0; padding-left:20px; line-height:1.8;">
+                        <li><strong>Texas (AAA)</strong> consistently scores highest — aligns with top credit rating</li>
+                        <li><strong>Illinois 2021 spike</strong> detected fiscal recovery 2 years before S&P upgraded (2023)</li>
+                        <li><strong>New Jersey scores below Illinois</strong> despite being rated higher by S&P (A+ vs A-) — GOV-1000 may detect fiscal stress that rating agencies have not yet reflected</li>
+                    </ul>
+                    <p style="color:#64748b; font-size:0.8em; margin:10px 0 0 0;">
+                        Credit ratings sourced from publicly available S&P reports. This tool is not affiliated with S&P Global.
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.info("Loading case study data... This may take a moment on first load.")
+
             # All states ranking
             st.markdown("<div style='font-size:1em; font-weight:700; color:#1e3a8a; margin-top:20px; margin-bottom:10px;'>ALL STATES</div>", unsafe_allow_html=True)
             st_cols = st.columns(3)
