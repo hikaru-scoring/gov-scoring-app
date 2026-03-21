@@ -705,6 +705,33 @@ def main():
                         """,
                         unsafe_allow_html=True
                     )
+                    with st.expander(f"Why {int(v1)}?", expanded=False):
+                        if axis == "Budget Efficiency":
+                            st.markdown(f"""
+**Formula:** `(Outlay / Budget Authority) × 120 + (Obligated / Budget Authority) × 80`
+**Raw Data:** Budget Authority: {_fmt_budget(data['budget_authority'])} | Obligated: {_fmt_budget(data['obligated'])} | Outlays: {_fmt_budget(data['outlay'])}
+**Source:** [USAspending.gov](https://www.usaspending.gov/)
+""")
+                        elif axis == "Transparency":
+                            st.markdown(f"""
+**Formula:** `Congressional Justification (60pts) + Sub-agency Reporting (up to 80pts) + Data Completeness (up to 60pts)`
+**Source:** [USAspending.gov Agency Profile](https://www.usaspending.gov/)
+""")
+                        elif axis == "Performance":
+                            st.markdown(f"""
+**Formula:** `Transaction Volume Score (up to 120pts) + New Award Count Score (up to 80pts)`
+**Source:** [USAspending.gov](https://www.usaspending.gov/)
+""")
+                        elif axis == "Fiscal Discipline":
+                            st.markdown(f"""
+**Formula:** `Budget Growth Score (up to 150pts) + Unobligated Balance Score (up to 50pts)`
+**Source:** [USAspending.gov Budgetary Resources](https://www.usaspending.gov/)
+""")
+                        elif axis == "Accountability":
+                            st.markdown(f"""
+**Formula:** `200 - (GAO Findings × 20)`
+**Source:** [GAO.gov Reports](https://www.gao.gov/)
+""")
 
             # --- III. Budget Snapshot (styled cards like FRS-1000) ---
             st.markdown("<div class='section-title'>III. Budget Snapshot</div>",
@@ -918,6 +945,43 @@ def main():
                         """,
                         unsafe_allow_html=True
                     )
+                    with st.expander(f"Why {int(v1)}?", expanded=False):
+                        if axis == "Budget Balance":
+                            _ratio = (state_data['revenue'] - state_data['expenditure']) / state_data['revenue'] if state_data['revenue'] > 0 else 0
+                            st.markdown(f"""
+**Formula:** Surplus: `100 + ratio × 500` | Deficit: `100 + ratio × 300`
+**Raw Data:** Revenue: {_fmt_budget(state_data['revenue'])} | Expenditure: {_fmt_budget(state_data['expenditure'])} | Ratio: {_ratio:.2%}
+**Source:** [Census Bureau - State Government Finances](https://www.census.gov/programs-surveys/gov-finances.html)
+""")
+                        elif axis == "Debt Burden":
+                            _debt_ratio = state_data['debt'] / state_data['revenue'] if state_data['revenue'] > 0 else 0
+                            st.markdown(f"""
+**Formula:** `200 - (Debt / Revenue) × 100`
+**Raw Data:** Debt: {_fmt_budget(state_data['debt'])} | Revenue: {_fmt_budget(state_data['revenue'])} | Ratio: {_debt_ratio:.2f}x
+**Source:** [Census Bureau - State Government Finances](https://www.census.gov/programs-surveys/gov-finances.html)
+""")
+                        elif axis == "Revenue Independence":
+                            _fed_dep = state_data['federal_revenue'] / state_data['revenue'] if state_data['revenue'] > 0 else 0
+                            st.markdown(f"""
+**Formula:** `200 - (Federal Revenue / Total Revenue) × 400`
+**Raw Data:** Federal Revenue: {_fmt_budget(state_data['federal_revenue'])} | Total Revenue: {_fmt_budget(state_data['revenue'])} | Federal Dependency: {_fed_dep:.1%}
+**Source:** [Census Bureau - State Government Finances](https://www.census.gov/programs-surveys/gov-finances.html)
+""")
+                        elif axis == "Spending Efficiency":
+                            _int_ratio = state_data['interest'] / state_data['expenditure'] if state_data['expenditure'] > 0 else 0
+                            _cap_ratio = state_data['capital_outlay'] / state_data['expenditure'] if state_data['expenditure'] > 0 else 0
+                            st.markdown(f"""
+**Formula:** `(1 - Interest Ratio) × 120 + Capital Ratio × 400`
+**Raw Data:** Interest: {_fmt_budget(state_data['interest'])} | Capital Outlay: {_fmt_budget(state_data['capital_outlay'])} | Interest Ratio: {_int_ratio:.2%} | Capital Ratio: {_cap_ratio:.2%}
+**Source:** [Census Bureau - State Government Finances](https://www.census.gov/programs-surveys/gov-finances.html)
+""")
+                        elif axis == "Fiscal Reserve":
+                            _reserve_ratio = state_data['cash_holdings'] / state_data['expenditure'] if state_data['expenditure'] > 0 else 0
+                            st.markdown(f"""
+**Formula:** `(Cash & Securities / Expenditure) × 100`
+**Raw Data:** Cash & Securities: {_fmt_budget(state_data['cash_holdings'])} | Expenditure: {_fmt_budget(state_data['expenditure'])} | Reserve Ratio: {_reserve_ratio:.2f}x
+**Source:** [Census Bureau - State Government Finances](https://www.census.gov/programs-surveys/gov-finances.html)
+""")
 
             # --- Fiscal Snapshot ---
             st.markdown("<div class='section-title'>III. Fiscal Snapshot</div>", unsafe_allow_html=True)
