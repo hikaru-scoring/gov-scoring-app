@@ -340,12 +340,13 @@ def main():
             st.error("Failed to load agency data. Please check your internet connection.")
 
         # --- State Scores Map ---
-        st.markdown("<div class='section-title' style='margin-top:40px;'>State Fiscal Health Map (2023)</div>",
+        map_year = st.slider("Select Year", min_value=2017, max_value=2023, value=2023, key="map_year_slider")
+        st.markdown(f"<div class='section-title'>State Fiscal Health Map ({map_year})</div>",
                     unsafe_allow_html=True)
 
         with st.spinner("Loading state data from Census Bureau..."):
-            finances_data = fetch_state_finances()
-            state_scores = score_all_states() if finances_data else None
+            finances_data = fetch_state_finances(year=map_year)
+            state_scores = score_all_states(year=map_year) if finances_data else None
 
         if state_scores:
             # Build score lookup for text labels
