@@ -495,6 +495,82 @@ def main():
 
                 st.markdown("---")
 
+            # --- GOV-1000 vs S&P Credit Rating scatter ---
+            st.markdown("<div class='section-title'>GOV-1000 Score vs S&P Credit Rating</div>", unsafe_allow_html=True)
+
+            import json as _json
+            _ratings_path = os.path.join(os.path.dirname(__file__), "state_ratings.json")
+            if os.path.exists(_ratings_path):
+                with open(_ratings_path, "r") as _rf:
+                    _ratings = _json.load(_rf)
+
+                _scatter_abbrs = []
+                _scatter_scores = []
+                _scatter_numeric = []
+                _scatter_labels = []
+                _scatter_colors = []
+
+                _rating_labels = {1: "AAA", 2: "AA+", 3: "AA", 4: "AA-", 5: "A+", 6: "A", 7: "A-"}
+
+                for s in state_scores:
+                    abbr = s["abbr"]
+                    if abbr in _ratings:
+                        _scatter_abbrs.append(abbr)
+                        _scatter_scores.append(s["total"])
+                        _scatter_numeric.append(_ratings[abbr]["numeric"])
+                        _scatter_labels.append(f"{s['name']} ({abbr})<br>Score: {s['total']} | Rating: {_ratings[abbr]['rating']}")
+                        # Color by rating
+                        n = _ratings[abbr]["numeric"]
+                        if n <= 1:
+                            _scatter_colors.append("#059669")
+                        elif n <= 2:
+                            _scatter_colors.append("#10b981")
+                        elif n <= 3:
+                            _scatter_colors.append("#2E7BE6")
+                        elif n <= 4:
+                            _scatter_colors.append("#60a5fa")
+                        elif n <= 5:
+                            _scatter_colors.append("#f59e0b")
+                        else:
+                            _scatter_colors.append("#ef4444")
+
+                fig_scatter = go.Figure()
+                fig_scatter.add_trace(go.Scatter(
+                    x=_scatter_scores,
+                    y=_scatter_numeric,
+                    mode="markers+text",
+                    text=_scatter_abbrs,
+                    textposition="top center",
+                    textfont=dict(size=9, color="#64748b"),
+                    marker=dict(size=14, color=_scatter_colors, line=dict(width=1, color="white")),
+                    hovertext=_scatter_labels,
+                    hoverinfo="text",
+                ))
+                fig_scatter.update_layout(
+                    xaxis=dict(title="GOV-1000 Score", range=[480, 780], gridcolor="#f0f0f0"),
+                    yaxis=dict(
+                        title="S&P Credit Rating",
+                        tickvals=[1, 2, 3, 4, 5, 6, 7],
+                        ticktext=["AAA", "AA+", "AA", "AA-", "A+", "A", "A-"],
+                        autorange="reversed",
+                        gridcolor="#f0f0f0",
+                    ),
+                    height=450,
+                    margin=dict(l=60, r=20, t=20, b=60),
+                    plot_bgcolor="white",
+                    paper_bgcolor="white",
+                    clickmode="none",
+                    dragmode=False,
+                )
+                st.plotly_chart(fig_scatter, use_container_width=True, config={"displayModeBar": False, "staticPlot": True}, key="scatter_rating")
+
+                st.markdown(
+                    "<p style='font-size:0.85em; color:#64748b; margin-top:-10px;'>"
+                    "States with higher GOV-1000 scores tend to have better S&P credit ratings. "
+                    "Data: S&P Global Ratings (2024–2025), Census Bureau (2023).</p>",
+                    unsafe_allow_html=True
+                )
+
             # All states ranking
             st.markdown("<div style='font-size:1em; font-weight:700; color:#1e3a8a; margin-top:20px; margin-bottom:10px;'>ALL STATES</div>", unsafe_allow_html=True)
             st_cols = st.columns(3)
