@@ -745,11 +745,38 @@ def main():
             total_st = state_data["total"]
 
             # --- Buttons ---
-            st_btn1, st_btn2, st_btn_rest = st.columns([1, 1, 8])
+            st_btn1, st_btn2, st_btn3, st_btn4, st_btn_rest = st.columns([1, 1, 1, 1, 6])
             with st_btn1:
                 st_save = st.button("Save", key="st_save")
             with st_btn2:
                 st_clear = st.button("Clear", key="st_clear")
+            with st_btn3:
+                # CSV export
+                import io as _io
+                csv_rows = [["Axis", "Score", "Description"]]
+                for ax in STATE_AXES_LABELS:
+                    csv_rows.append([ax, str(state_data["axes"][ax]), STATE_LOGIC_DESC.get(ax, "")])
+                csv_rows.append(["TOTAL", str(total_st), ""])
+                csv_content = "\n".join([",".join(row) for row in csv_rows])
+                st.download_button("CSV", csv_content.encode("utf-8"),
+                                   file_name=f"GOV1000_State_{state_data['abbr']}.csv",
+                                   mime="text/csv", key="st_csv")
+            with st_btn4:
+                # PDF export
+                pdf_bytes = generate_pdf(
+                    state_data, STATE_AXES_LABELS, "State Score",
+                    logic_descriptions=STATE_LOGIC_DESC,
+                    snapshot={
+                        "Revenue": _fmt_budget(state_data["revenue"]),
+                        "Expenditure": _fmt_budget(state_data["expenditure"]),
+                        "Debt": _fmt_budget(state_data["debt"]),
+                        "Reserves": _fmt_budget(state_data["cash_holdings"]),
+                    },
+                    company_name=company_name,
+                )
+                st.download_button("PDF", pdf_bytes,
+                                   file_name=f"GOV1000_State_{state_data['abbr']}.pdf",
+                                   mime="application/pdf", key="st_pdf")
 
             if st_save:
                 st.session_state.saved_state_data = state_data
@@ -1050,6 +1077,83 @@ def main():
                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             )
             st.plotly_chart(fig_stack, use_container_width=True, config={"displayModeBar": False})
+
+        # --- STATE RANKINGS ---
+        st.markdown(
+            "<div style='font-size:1.5em; font-weight:900; color:#1e3a8a; margin-top:40px; margin-bottom:20px;'>"
+            "All States Ranking</div>",
+            unsafe_allow_html=True,
+        )
+
+        with st.spinner("Loading state rankings..."):
+            state_ranking_scores = score_all_states()
+
+        if state_ranking_scores:
+            sort_by_st = st.selectbox("Sort by", ["Total Score"] + STATE_AXES_LABELS, key="rank_sort_state")
+
+            if sort_by_st == "Total Score":
+                state_ranking_scores.sort(key=lambda x: x["total"], reverse=True)
+            else:
+                state_ranking_scores.sort(key=lambda x: x["axes"].get(sort_by_st, 0), reverse=True)
+
+            for idx, s in enumerate(state_ranking_scores, 1):
+                score = s["total"]
+                if score >= 700:
+                    bar_color = "#10b981"
+                elif score >= 500:
+                    bar_color = "#2E7BE6"
+                elif score >= 300:
+                    bar_color = "#f59e0b"
+                else:
+                    bar_color = "#ef4444"
+
+                st.markdown(f"""
+                <div style="display:flex; align-items:center; padding:14px 20px; background:#fff; border-radius:12px; margin-bottom:8px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    <div style="font-size:1.4em; font-weight:900; color:#94a3b8; width:40px;">#{idx}</div>
+                    <div style="flex:1;">
+                        <div style="font-size:1.05em; font-weight:700; color:#1e293b;">{s['name']}</div>
+                        <span style="font-size:0.75em; background:#2E7BE6; color:#fff; padding:2px 8px; border-radius:20px;">{s['abbr']}</span>
+                    </div>
+                    <div style="text-align:right; margin-right:15px; font-size:0.85em; color:#94a3b8;">
+                        {_fmt_budget(s['revenue'])}
+                    </div>
+                    <div style="text-align:right; min-width:80px;">
+                        <div style="font-size:1.5em; font-weight:900; color:{bar_color};">{score}</div>
+                        <div style="background:#f1f5f9; border-radius:4px; height:6px; width:80px; margin-top:4px;">
+                            <div style="background:{bar_color}; height:6px; border-radius:4px; width:{score/10}%;"></div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # State bar chart
+            st.markdown("<div class='section-title'>State Score Distribution</div>",
+                        unsafe_allow_html=True)
+            fig_st_bar = go.Figure()
+            st_colors = []
+            for s in state_ranking_scores:
+                if s["total"] >= 700:
+                    st_colors.append("#10b981")
+                elif s["total"] >= 500:
+                    st_colors.append("#2E7BE6")
+                elif s["total"] >= 300:
+                    st_colors.append("#f59e0b")
+                else:
+                    st_colors.append("#ef4444")
+            fig_st_bar.add_trace(go.Bar(
+                x=[s["abbr"] for s in state_ranking_scores],
+                y=[s["total"] for s in state_ranking_scores],
+                marker_color=st_colors,
+                text=[s["total"] for s in state_ranking_scores],
+                textposition='outside',
+                textfont=dict(size=8),
+            ))
+            fig_st_bar.update_layout(
+                yaxis=dict(range=[0, 1000], title="Score"),
+                height=450, margin=dict(l=0, r=0, t=10, b=0),
+                plot_bgcolor='white', clickmode='none', dragmode=False,
+            )
+            st.plotly_chart(fig_st_bar, use_container_width=True, config={"displayModeBar": False})
 
         else:
             st.error("Failed to load ranking data.")
