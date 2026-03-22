@@ -49,7 +49,7 @@ MUNICIPAL_AXES_LABELS = [
     "Tax Base Strength",
     "Revenue Independence",
     "Spending Efficiency",
-    "Fiscal Capacity",
+    "Economic Health",
 ]
 
 MUNICIPAL_LOGIC_DESC = {
@@ -70,10 +70,10 @@ MUNICIPAL_LOGIC_DESC = {
         "How well revenue covers expenditure. "
         "score = (revenue / expenditure) * 120, clamped 0-200."
     ),
-    "Fiscal Capacity": (
-        "Revenue per capita as a proxy for fiscal capacity. "
-        "score = revenue_per_capita / 50, clamped 0-200. "
-        "$10,000/capita = 200 points."
+    "Economic Health": (
+        "Median income x Poverty rate x Unemployment rate. "
+        "Combines ACS median income, poverty rate, and BLS unemployment. "
+        "Falls back to revenue per capita if ACS/BLS data unavailable."
     ),
 }
 
@@ -159,7 +159,106 @@ def _clamp(value: float, lo: float = 0.0, hi: float = 200.0) -> float:
     return max(lo, min(hi, value))
 
 
-def score_municipality(gov_id: str, pid_data: dict, finance_data: dict) -> dict | None:
+@st.cache_data(ttl=86400, show_spinner=False)
+def fetch_acs_county_data(year: int = 2022) -> dict:
+    """Fetch county-level economic data from Census ACS 5-Year API.
+
+    Returns dict keyed by 5-digit county FIPS:
+    {fips: {"median_income": int, "per_capita_income": int, "population": int, "poverty_pop": int}, ...}
+    """
+    import requests
+    url = f"https://api.census.gov/data/{year}/acs/acs5"
+    params = {
+        "get": "NAME,B19013_001E,B19301_001E,B01003_001E,B17001_002E",
+        "for": "county:*",
+    }
+    try:
+        r = requests.get(url, params=params, timeout=60)
+        r.raise_for_status()
+        rows = r.json()
+    except Exception:
+        return {}
+
+    result = {}
+    # First row is headers
+    for row in rows[1:]:
+        # row: [NAME, median_income, per_capita_income, population, poverty_pop, state, county]
+        state_fips = row[5]
+        county_fips = row[6]
+        fips = f"{state_fips}{county_fips}"
+        try:
+            result[fips] = {
+                "name": row[0],
+                "median_income": int(row[1]) if row[1] else 0,
+                "per_capita_income": int(row[2]) if row[2] else 0,
+                "population": int(row[3]) if row[3] else 0,
+                "poverty_pop": int(row[4]) if row[4] else 0,
+            }
+        except (ValueError, TypeError):
+            continue
+    return result
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def fetch_bls_county_unemployment() -> dict:
+    """Fetch annual average unemployment rate for all counties from BLS LAUS.
+
+    Returns dict keyed by 5-digit county FIPS: {fips: unemployment_rate, ...}
+
+    Uses BLS API v2 (no key required for basic access).
+    Fetches in batches of 25 series per request.
+    """
+    import requests
+    import time
+
+    # Get all county FIPS from ACS data
+    acs = fetch_acs_county_data()
+    if not acs:
+        return {}
+
+    all_fips = list(acs.keys())
+    result = {}
+
+    # BLS allows 25 series per request
+    batch_size = 25
+    for i in range(0, len(all_fips), batch_size):
+        batch_fips = all_fips[i:i + batch_size]
+        series_ids = [f"LAUCN{fips}0000000003" for fips in batch_fips]
+
+        try:
+            r = requests.post(
+                "https://api.bls.gov/publicAPI/v2/timeseries/data/",
+                json={"seriesid": series_ids, "startyear": "2022", "endyear": "2022"},
+                timeout=30,
+            )
+            r.raise_for_status()
+            data = r.json()
+
+            if data.get("status") == "REQUEST_SUCCEEDED":
+                for series in data.get("Results", {}).get("series", []):
+                    sid = series["seriesID"]
+                    # Extract FIPS from series ID: LAUCN{5-digit FIPS}0000000003
+                    fips = sid[5:10]
+                    # Get annual average (M13)
+                    for d in series.get("data", []):
+                        if d.get("period") == "M13":  # Annual average
+                            try:
+                                result[fips] = float(d["value"])
+                            except (ValueError, TypeError):
+                                pass
+                            break
+        except Exception:
+            pass
+
+        # Rate limiting - be respectful
+        if i + batch_size < len(all_fips):
+            time.sleep(1)
+
+    return result
+
+
+def score_municipality(gov_id: str, pid_data: dict, finance_data: dict,
+                       acs_data: dict | None = None, bls_data: dict | None = None) -> dict | None:
     """Score a single municipality across 5 fiscal axes (0-200 each, total 0-1000).
 
     Returns None if the gov_id is not found in pid_data.
@@ -203,19 +302,39 @@ def score_municipality(gov_id: str, pid_data: dict, finance_data: dict) -> dict 
     # Axis 4: Spending Efficiency (200)
     ax4 = _clamp((revenue / max(expenditure, 1)) * 120)
 
-    # Axis 5: Fiscal Capacity (200)
-    if population > 0:
-        revenue_per_capita = revenue / population
-        ax5 = _clamp(revenue_per_capita / 50)
-    else:
-        ax5 = 0.0
+    # Axis 5: Economic Health (200)
+    # Try ACS/BLS data first (municipality uses fips_place mapped via county)
+    fips = info.get("fips_county") or info.get("fips_place", "")
+    _ax5_set = False
+    if acs_data and fips in acs_data:
+        acs = acs_data[fips]
+        pop = acs["population"] or 1
+        poverty_rate = acs["poverty_pop"] / pop
+        income_score = _clamp(acs["median_income"] / 500, 0, 100)
+        poverty_score = _clamp(100 - poverty_rate * 500, 0, 100)
+
+        if bls_data and fips in bls_data:
+            unemp = bls_data[fips]
+            unemp_score = _clamp(100 - unemp * 15, 0, 100)
+            ax5 = _clamp((income_score * 0.4 + poverty_score * 0.3 + unemp_score * 0.3) * 2, 0, 200)
+        else:
+            ax5 = _clamp((income_score * 0.5 + poverty_score * 0.5) * 2, 0, 200)
+        _ax5_set = True
+
+    if not _ax5_set:
+        # Fallback to old revenue per capita method
+        if population > 0:
+            revenue_per_capita = revenue / population
+            ax5 = _clamp(revenue_per_capita / 50)
+        else:
+            ax5 = 0.0
 
     axes = {
         "Budget Balance": round(ax1, 1),
         "Tax Base Strength": round(ax2, 1),
         "Revenue Independence": round(ax3, 1),
         "Spending Efficiency": round(ax4, 1),
-        "Fiscal Capacity": round(ax5, 1),
+        "Economic Health": round(ax5, 1),
     }
 
     return {
@@ -307,7 +426,8 @@ def parse_pid_file_counties(filepath: str) -> dict:
     return result
 
 
-def score_county(gov_id: str, pid_data: dict, finance_data: dict) -> dict | None:
+def score_county(gov_id: str, pid_data: dict, finance_data: dict,
+                 acs_data: dict | None = None, bls_data: dict | None = None) -> dict | None:
     """Score a county using same 5 axes as municipalities.
 
     Returns dict with additional 'fips_county' field (5-digit: state_fips + county_fips).
@@ -351,19 +471,38 @@ def score_county(gov_id: str, pid_data: dict, finance_data: dict) -> dict | None
     # Axis 4: Spending Efficiency (200)
     ax4 = _clamp((revenue / max(expenditure, 1)) * 120)
 
-    # Axis 5: Fiscal Capacity (200)
-    if population > 0:
-        revenue_per_capita = revenue / population
-        ax5 = _clamp(revenue_per_capita / 50)
-    else:
-        ax5 = 0.0
+    # Axis 5: Economic Health (200)
+    fips = info["fips_county"]
+    _ax5_set = False
+    if acs_data and fips in acs_data:
+        acs = acs_data[fips]
+        pop = acs["population"] or 1
+        poverty_rate = acs["poverty_pop"] / pop
+        income_score = _clamp(acs["median_income"] / 500, 0, 100)
+        poverty_score = _clamp(100 - poverty_rate * 500, 0, 100)
+
+        if bls_data and fips in bls_data:
+            unemp = bls_data[fips]
+            unemp_score = _clamp(100 - unemp * 15, 0, 100)
+            ax5 = _clamp((income_score * 0.4 + poverty_score * 0.3 + unemp_score * 0.3) * 2, 0, 200)
+        else:
+            ax5 = _clamp((income_score * 0.5 + poverty_score * 0.5) * 2, 0, 200)
+        _ax5_set = True
+
+    if not _ax5_set:
+        # Fallback to old revenue per capita method
+        if population > 0:
+            revenue_per_capita = revenue / population
+            ax5 = _clamp(revenue_per_capita / 50)
+        else:
+            ax5 = 0.0
 
     axes = {
         "Budget Balance": round(ax1, 1),
         "Tax Base Strength": round(ax2, 1),
         "Revenue Independence": round(ax3, 1),
         "Spending Efficiency": round(ax4, 1),
-        "Fiscal Capacity": round(ax5, 1),
+        "Economic Health": round(ax5, 1),
     }
 
     return {
@@ -391,12 +530,73 @@ def load_and_score_all_counties(year: int = 2022) -> list[dict]:
     paths = DATA_FILES[year]
     pid_data = parse_pid_file_counties(paths["pid"])
     finance_data = parse_finance_file(paths["finance"])
+    acs_data = fetch_acs_county_data(year)
+    bls_data = fetch_bls_county_unemployment()
 
+    # Score counties that have Census fiscal data
     scored = []
+    scored_fips = set()
     for gov_id in pid_data:
-        result = score_county(gov_id, pid_data, finance_data)
+        result = score_county(gov_id, pid_data, finance_data, acs_data, bls_data)
         if result is not None and result["total"] > 0:
             scored.append(result)
+            scored_fips.add(result["fips_county"])
+
+    # ADD counties that have ACS data but NOT Census fiscal data (fills white gaps!)
+    for fips, acs in acs_data.items():
+        if fips in scored_fips:
+            continue
+        if len(fips) != 5:
+            continue
+        state_fips = fips[:2]
+        if state_fips not in STATE_ABBR:
+            continue
+
+        # Score with ACS/BLS only (fiscal axes get neutral 100)
+        pop = acs.get("population", 0)
+        if pop <= 0:
+            continue
+
+        # Neutral fiscal scores since we don't have fiscal data
+        ax1 = 100.0  # Budget Balance - neutral
+        ax2 = 100.0  # Tax Base Strength - neutral
+        ax3 = 100.0  # Revenue Independence - neutral
+        ax4 = 100.0  # Spending Efficiency - neutral
+
+        # Economic Health from ACS/BLS
+        poverty_rate = acs.get("poverty_pop", 0) / pop
+        income_score = _clamp(acs.get("median_income", 0) / 500, 0, 100)
+        poverty_score = _clamp(100 - poverty_rate * 500, 0, 100)
+
+        unemp_rate = bls_data.get(fips)
+        if unemp_rate is not None:
+            unemp_score = _clamp(100 - unemp_rate * 15, 0, 100)
+            ax5 = _clamp((income_score * 0.4 + poverty_score * 0.3 + unemp_score * 0.3) * 2, 0, 200)
+        else:
+            ax5 = _clamp((income_score * 0.5 + poverty_score * 0.5) * 2, 0, 200)
+
+        axes = {
+            "Budget Balance": round(ax1, 1),
+            "Tax Base Strength": round(ax2, 1),
+            "Revenue Independence": round(ax3, 1),
+            "Spending Efficiency": round(ax4, 1),
+            "Economic Health": round(ax5, 1),
+        }
+
+        scored.append({
+            "name": acs.get("name", f"County {fips}"),
+            "gov_id": f"ACS_{fips}",
+            "state_fips": state_fips,
+            "state_abbr": STATE_ABBR.get(state_fips, "??"),
+            "population": pop,
+            "axes": axes,
+            "total": round(sum(axes.values()), 1),
+            "revenue": 0,
+            "expenditure": 0,
+            "taxes": 0,
+            "ig_revenue": 0,
+            "fips_county": fips,
+        })
 
     scored.sort(key=lambda x: x["total"], reverse=True)
     return scored

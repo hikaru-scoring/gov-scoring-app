@@ -1207,7 +1207,7 @@ def main():
                         "Tax Base Strength": "Self-generated tax revenue ratio",
                         "Revenue Independence": "Low reliance on state/federal transfers",
                         "Spending Efficiency": "Revenue-to-expenditure coverage",
-                        "Fiscal Capacity": "Revenue per capita strength",
+                        "Economic Health": "Median income, poverty & unemployment",
                     }.get(axis, desc_text)
 
                     st.markdown(
@@ -1399,7 +1399,7 @@ def main():
                         "Tax Base Strength": "Self-generated tax revenue ratio",
                         "Revenue Independence": "Low reliance on state/federal transfers",
                         "Spending Efficiency": "Revenue-to-expenditure coverage",
-                        "Fiscal Capacity": "Revenue per capita strength",
+                        "Economic Health": "Median income, poverty & unemployment",
                     }.get(axis, "")
 
                     st.markdown(
