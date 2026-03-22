@@ -267,6 +267,142 @@ def load_and_score_top_cities(n: int = 100, year: int = 2022) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# County scoring (type_code '1')
+# ---------------------------------------------------------------------------
+COUNTY_AXES_LABELS = list(MUNICIPAL_AXES_LABELS)
+COUNTY_LOGIC_DESC = dict(MUNICIPAL_LOGIC_DESC)
+
+
+def parse_pid_file_counties(filepath: str) -> dict:
+    """Parse PID file for county governments (type_code '1').
+
+    Returns dict mapping gov_id to {name, state_fips, county_fips, population, fips_county}.
+    The 5-digit county FIPS = state_fips (2 chars, positions 0-1) + county code (positions 3-5).
+    """
+    result = {}
+    with open(filepath, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if len(line.rstrip("\n\r")) < 126:
+                continue
+            type_code = line[2]
+            if type_code != "1":
+                continue
+            gov_id = line[0:12]
+            name = line[12:76].strip()
+            state_fips = line[0:2]
+            county_code = line[3:6]  # positions 3-5 (3 chars)
+            pop_str = line[116:125].strip()
+            try:
+                population = int(pop_str)
+            except (ValueError, IndexError):
+                population = 0
+            fips_county = f"{state_fips}{county_code}"  # 5-digit FIPS
+            result[gov_id] = {
+                "name": name,
+                "state_fips": state_fips,
+                "county_fips": county_code,
+                "population": population,
+                "fips_county": fips_county,
+            }
+    return result
+
+
+def score_county(gov_id: str, pid_data: dict, finance_data: dict) -> dict | None:
+    """Score a county using same 5 axes as municipalities.
+
+    Returns dict with additional 'fips_county' field (5-digit: state_fips + county_fips).
+    """
+    if gov_id not in pid_data:
+        return None
+
+    info = pid_data[gov_id]
+    fin = finance_data.get(gov_id, {})
+
+    revenue = fin.get(ITEM_TOTAL_REVENUE, 0)
+    expenditure = fin.get(ITEM_TOTAL_EXPENDITURE, 0)
+    taxes = fin.get(ITEM_TOTAL_TAXES, 0)
+    ig_revenue = fin.get(ITEM_IG_REVENUE, 0)
+    population = info["population"]
+
+    # Axis 1: Budget Balance (200)
+    if revenue > 0:
+        ratio = (revenue - expenditure) / revenue
+        if ratio >= 0:
+            ax1 = _clamp(100 + ratio * 500)
+        else:
+            ax1 = _clamp(100 + ratio * 300)
+    else:
+        ax1 = 0.0
+
+    # Axis 2: Tax Base Strength (200)
+    if revenue > 0:
+        tax_ratio = taxes / revenue
+        ax2 = _clamp(tax_ratio * 300)
+    else:
+        ax2 = 0.0
+
+    # Axis 3: Revenue Independence (200)
+    if revenue > 0:
+        ig_ratio = ig_revenue / revenue
+        ax3 = _clamp(200 - ig_ratio * 400)
+    else:
+        ax3 = 0.0
+
+    # Axis 4: Spending Efficiency (200)
+    ax4 = _clamp((revenue / max(expenditure, 1)) * 120)
+
+    # Axis 5: Fiscal Capacity (200)
+    if population > 0:
+        revenue_per_capita = revenue / population
+        ax5 = _clamp(revenue_per_capita / 50)
+    else:
+        ax5 = 0.0
+
+    axes = {
+        "Budget Balance": round(ax1, 1),
+        "Tax Base Strength": round(ax2, 1),
+        "Revenue Independence": round(ax3, 1),
+        "Spending Efficiency": round(ax4, 1),
+        "Fiscal Capacity": round(ax5, 1),
+    }
+
+    return {
+        "name": info["name"],
+        "gov_id": gov_id,
+        "state_fips": info["state_fips"],
+        "state_abbr": STATE_ABBR.get(info["state_fips"], "??"),
+        "population": population,
+        "axes": axes,
+        "total": round(sum(axes.values()), 1),
+        "revenue": revenue,
+        "expenditure": expenditure,
+        "taxes": taxes,
+        "ig_revenue": ig_revenue,
+        "fips_county": info["fips_county"],
+    }
+
+
+@st.cache_data(ttl=86400)
+def load_and_score_all_counties(year: int = 2022) -> list[dict]:
+    """Load and score ALL counties. Returns list sorted by total score descending."""
+    if year not in DATA_FILES:
+        raise ValueError(f"No data files configured for year {year}")
+
+    paths = DATA_FILES[year]
+    pid_data = parse_pid_file_counties(paths["pid"])
+    finance_data = parse_finance_file(paths["finance"])
+
+    scored = []
+    for gov_id in pid_data:
+        result = score_county(gov_id, pid_data, finance_data)
+        if result is not None:
+            scored.append(result)
+
+    scored.sort(key=lambda x: x["total"], reverse=True)
+    return scored
+
+
+# ---------------------------------------------------------------------------
 # CLI quick test
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
