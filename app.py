@@ -1335,11 +1335,10 @@ def main():
                 labels={'score': 'GOV-1000 Score'},
             )
             fig_county_map.update_layout(
-                margin=dict(l=0, r=0, t=0, b=0),
-                height=600,
+                margin=dict(l=0, r=0, t=10, b=0),
+                height=800,
                 geo=dict(
                     scope="usa",
-                    fitbounds="locations",
                     visible=True,
                 ),
                 coloraxis_colorbar=dict(
