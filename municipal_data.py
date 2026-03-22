@@ -395,7 +395,7 @@ def load_and_score_all_counties(year: int = 2022) -> list[dict]:
     scored = []
     for gov_id in pid_data:
         result = score_county(gov_id, pid_data, finance_data)
-        if result is not None:
+        if result is not None and result["total"] > 0:
             scored.append(result)
 
     scored.sort(key=lambda x: x["total"], reverse=True)
