@@ -275,6 +275,10 @@ def score_municipality(gov_id: str, pid_data: dict, finance_data: dict,
     ig_revenue = fin.get(ITEM_IG_REVENUE, 0)
     population = info["population"]
 
+    # Skip entries with no fiscal data — don't produce misleading scores
+    if revenue == 0 and expenditure == 0:
+        return None
+
     # Axis 1: Budget Balance (200)
     if revenue > 0:
         ratio = (revenue - expenditure) / revenue
@@ -443,6 +447,10 @@ def score_county(gov_id: str, pid_data: dict, finance_data: dict,
     taxes = fin.get(ITEM_TOTAL_TAXES, 0)
     ig_revenue = fin.get(ITEM_IG_REVENUE, 0)
     population = info["population"]
+
+    # Skip entries with no fiscal data — don't produce misleading scores
+    if revenue == 0 and expenditure == 0:
+        return None
 
     # Axis 1: Budget Balance (200)
     if revenue > 0:
