@@ -68,7 +68,7 @@ STATE_AXES_LABELS = [
     "Debt Burden",
     "Revenue Independence",
     "Spending Efficiency",
-    "Fiscal Reserve",
+    "Economic Health",
 ]
 
 STATE_LOGIC_DESC = {
@@ -76,7 +76,7 @@ STATE_LOGIC_DESC = {
     "Debt Burden": "Total debt relative to revenue",
     "Revenue Independence": "Self-generated vs Federal funding ratio",
     "Spending Efficiency": "Low interest cost x High capital investment",
-    "Fiscal Reserve": "Cash & securities relative to spending",
+    "Economic Health": "Reserves x Income x Poverty x Unemployment",
 }
 
 # ---------------------------------------------------------------------------
@@ -101,6 +101,81 @@ _VARIABLE_CODES = {
 
 def _clamp(value, lo=0, hi=200):
     return int(min(max(value, lo), hi))
+
+
+# ---------------------------------------------------------------------------
+# ACS / BLS supplementary data for Economic Health axis
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def fetch_acs_state_data(year: int = 2022) -> dict:
+    """Fetch state-level economic data from Census ACS 5-Year API.
+    Returns dict keyed by state FIPS: {fips: {median_income, per_capita_income, population, poverty_pop}}
+    """
+    url = f"https://api.census.gov/data/{year}/acs/acs5"
+    params = {
+        "get": "NAME,B19013_001E,B19301_001E,B01003_001E,B17001_002E",
+        "for": "state:*",
+    }
+    try:
+        r = requests.get(url, params=params, timeout=60)
+        r.raise_for_status()
+        rows = r.json()
+    except Exception:
+        return {}
+
+    result = {}
+    for row in rows[1:]:
+        state_fips = row[5].zfill(2)
+        try:
+            result[state_fips] = {
+                "median_income": int(row[1]) if row[1] else 0,
+                "per_capita_income": int(row[2]) if row[2] else 0,
+                "population": int(row[3]) if row[3] else 0,
+                "poverty_pop": int(row[4]) if row[4] else 0,
+            }
+        except (ValueError, TypeError):
+            continue
+    return result
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def fetch_bls_state_unemployment() -> dict:
+    """Fetch annual average unemployment rate for all states from BLS LAUS.
+    Returns dict keyed by state FIPS: {fips: unemployment_rate}
+    """
+    # State LAUS series: LASST{state_fips}0000000000003 = unemployment rate
+    all_fips = list(STATES.keys())
+    result = {}
+
+    batch_size = 25
+    for i in range(0, len(all_fips), batch_size):
+        batch = all_fips[i:i+batch_size]
+        series_ids = [f"LASST{fips}0000000000003" for fips in batch]
+        try:
+            r = requests.post(
+                "https://api.bls.gov/publicAPI/v2/timeseries/data/",
+                json={"seriesid": series_ids, "startyear": "2022", "endyear": "2022"},
+                timeout=30,
+            )
+            r.raise_for_status()
+            data = r.json()
+            if data.get("status") == "REQUEST_SUCCEEDED":
+                for series in data.get("Results", {}).get("series", []):
+                    sid = series["seriesID"]
+                    fips = sid[5:7]
+                    for d in series.get("data", []):
+                        if d.get("period") == "M13":
+                            try:
+                                result[fips] = float(d["value"])
+                            except (ValueError, TypeError):
+                                pass
+                            break
+        except Exception:
+            pass
+        if i + batch_size < len(all_fips):
+            time.sleep(1)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +248,8 @@ def fetch_state_finances(year: int = 2023) -> dict | None:
 # Score a single state
 # ---------------------------------------------------------------------------
 
-def score_state(fips_code: str, finances: dict | None = None) -> dict | None:
+def score_state(fips_code: str, finances: dict | None = None,
+                acs_data: dict | None = None, bls_data: dict | None = None) -> dict | None:
     """Compute 5-axis score (0-1000) for one state.
 
     Parameters
@@ -239,19 +315,39 @@ def score_state(fips_code: str, finances: dict | None = None) -> dict | None:
     else:
         ax4 = 0
 
-    # --- Axis 5: Fiscal Reserve (200) ---
+    # --- Axis 5: Economic Health (200) ---
+    # 50% reserves + 50% economic indicators (ACS income/poverty + BLS unemployment)
+    reserve_score = 0
     if expenditure > 0:
         reserve_ratio = cash / expenditure
-        ax5 = _clamp(reserve_ratio * 100, 0, 200)
+        reserve_score = min(max(reserve_ratio * 100, 0), 200)
+
+    econ_score = reserve_score  # fallback: use reserves only
+    if acs_data and fips_code in acs_data:
+        acs = acs_data[fips_code]
+        pop = acs.get("population", 1) or 1
+        poverty_rate = acs.get("poverty_pop", 0) / pop
+        income_score = min(max(acs.get("median_income", 0) / 500, 0), 100)
+        poverty_score = min(max(100 - poverty_rate * 500, 0), 100)
+
+        unemp_rate = bls_data.get(fips_code) if bls_data else None
+        if unemp_rate is not None:
+            unemp_score = min(max(100 - unemp_rate * 15, 0), 100)
+            econ_raw = (income_score * 0.4 + poverty_score * 0.3 + unemp_score * 0.3) * 2
+        else:
+            econ_raw = (income_score * 0.5 + poverty_score * 0.5) * 2
+        econ_score = min(max(econ_raw, 0), 200)
+        # Blend: 50% reserves + 50% economic indicators
+        ax5 = _clamp((reserve_score * 0.5 + econ_score * 0.5), 0, 200)
     else:
-        ax5 = 0
+        ax5 = _clamp(reserve_score, 0, 200)
 
     axes = {
         "Budget Balance": ax1,
         "Debt Burden": ax2,
         "Revenue Independence": ax3,
         "Spending Efficiency": ax4,
-        "Fiscal Reserve": ax5,
+        "Economic Health": ax5,
     }
 
     state_info = STATES[fips_code]
@@ -287,9 +383,12 @@ def score_all_states(year: int = 2023) -> list[dict] | None:
     if finances is None:
         return None
 
+    acs_data = fetch_acs_state_data(year)
+    bls_data = fetch_bls_state_unemployment()
+
     results = []
     for fips in STATES:
-        scored = score_state(fips, finances)
+        scored = score_state(fips, finances, acs_data, bls_data)
         if scored is not None:
             results.append(scored)
 

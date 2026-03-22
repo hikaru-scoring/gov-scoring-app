@@ -1042,12 +1042,12 @@ def main():
 **Raw Data:** Interest: {_fmt_budget(state_data['interest'])} | Capital Outlay: {_fmt_budget(state_data['capital_outlay'])} | Interest Ratio: {_int_ratio:.2%} | Capital Ratio: {_cap_ratio:.2%}
 **Source:** [Census Bureau - State Government Finances](https://www.census.gov/programs-surveys/gov-finances.html)
 """)
-                        elif axis == "Fiscal Reserve":
+                        elif axis == "Economic Health":
                             _reserve_ratio = state_data['cash_holdings'] / state_data['expenditure'] if state_data['expenditure'] > 0 else 0
                             st.markdown(f"""
-**Formula:** `(Cash & Securities / Expenditure) × 100`
-**Raw Data:** Cash & Securities: {_fmt_budget(state_data['cash_holdings'])} | Expenditure: {_fmt_budget(state_data['expenditure'])} | Reserve Ratio: {_reserve_ratio:.2f}x
-**Source:** [Census Bureau - State Government Finances](https://www.census.gov/programs-surveys/gov-finances.html)
+**Formula:** `50% Reserves + 50% Economic Indicators (Income 40% + Poverty 30% + Unemployment 30%)`
+**Raw Data:** Cash & Securities: {_fmt_budget(state_data['cash_holdings'])} | Reserve Ratio: {_reserve_ratio:.2f}x
+**Sources:** [Census Bureau](https://www.census.gov/programs-surveys/gov-finances.html) | [Census ACS](https://www.census.gov/programs-surveys/acs) | [BLS LAUS](https://www.bls.gov/lau/)
 """)
 
             # --- Fiscal Snapshot ---
