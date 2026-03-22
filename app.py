@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from data_logic import AGENCIES, AXES_LABELS, score_agency, fetch_agency_budgetary_resources
 from state_data import STATES, STATE_AXES_LABELS, STATE_LOGIC_DESC, score_all_states, score_state, fetch_state_finances, fetch_state_score_history
+from municipal_data import MUNICIPAL_AXES_LABELS, MUNICIPAL_LOGIC_DESC, load_and_score_top_cities
 from ui_components import inject_css, render_radar_chart
 from pdf_report import generate_pdf
 
@@ -199,7 +200,7 @@ def main():
     if "saved_state_data" not in st.session_state:
         st.session_state.saved_state_data = None
 
-    tab_dash, tab_agency, tab_states, tab_rankings = st.tabs(["Dashboard", "Agency Detail", "State Scores", "Rankings"])
+    tab_dash, tab_agency, tab_states, tab_cities, tab_rankings = st.tabs(["Dashboard", "Agency Detail", "State Scores", "City Scores", "Rankings"])
 
     # ===================================================================
     # DASHBOARD TAB
@@ -1142,6 +1143,136 @@ def main():
 
         else:
             st.error("Failed to load state data. Please check your internet connection.")
+
+    # ===================================================================
+    # CITY SCORES TAB
+    # ===================================================================
+    with tab_cities:
+        st.markdown(
+            "<div class='company-header'>City Scores</div>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            "<p style='color:#64748b; margin-bottom:20px;'>Fiscal health scores for the top 100 US municipalities by population. Data: Census Bureau (2022).</p>",
+            unsafe_allow_html=True
+        )
+
+        with st.spinner("Loading city data..."):
+            city_scores = load_and_score_top_cities(n=100, year=2022)
+
+        if city_scores:
+            # City selector
+            city_options = {f"{c['name']}, {c['state_abbr']} (pop. {c['population']:,})": i for i, c in enumerate(city_scores)}
+            selected_city_label = st.selectbox("Select City", list(city_options.keys()), key="city_select")
+            selected_idx = city_options[selected_city_label]
+            city_data = city_scores[selected_idx]
+
+            total_city = city_data["total"]
+
+            # --- Total Score ---
+            st.markdown(f"""
+            <div style="text-align:center; margin-top:4px; margin-bottom:10px;">
+                <div style="font-size:14px; letter-spacing:2px; color:#666;">TOTAL SCORE</div>
+                <div style="font-size:90px; font-weight:800; color:#2E7BE6; line-height:1;">
+                    {int(total_city)}
+                    <span style="font-size:35px; color:#BBB;">/ 1000</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # --- Radar + Metrics ---
+            city_col_left, city_col_right = st.columns([1.5, 1])
+
+            with city_col_left:
+                st.markdown("<div style='font-size: 1.1em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 5px;'>I. Intelligence Radar</div>", unsafe_allow_html=True)
+                city_radar_data = {"name": city_data["name"], "axes": city_data["axes"]}
+                fig_city = render_radar_chart(city_radar_data, None, MUNICIPAL_AXES_LABELS)
+                st.plotly_chart(fig_city, use_container_width=True, config={"displayModeBar": False}, key="city_radar")
+
+            with city_col_right:
+                st.markdown(
+                    "<div style='font-size: 0.9em; font-weight: bold; color: #333; margin-top: -10px; margin-bottom: 15px; border-left: 3px solid #2E7BE6; padding-left: 8px;'>II. ANALYSIS SCORE METRICS</div>",
+                    unsafe_allow_html=True
+                )
+
+                for axis in MUNICIPAL_AXES_LABELS:
+                    v1 = city_data["axes"][axis]
+                    desc_text = MUNICIPAL_LOGIC_DESC.get(axis, "")
+                    # Keep description short for card display
+                    short_desc = {
+                        "Budget Balance": "Revenue vs Expenditure ratio",
+                        "Tax Base Strength": "Self-generated tax revenue ratio",
+                        "Revenue Independence": "Low reliance on state/federal transfers",
+                        "Spending Efficiency": "Revenue-to-expenditure coverage",
+                        "Fiscal Capacity": "Revenue per capita strength",
+                    }.get(axis, desc_text)
+
+                    st.markdown(
+                        f"""
+                        <div style="
+                            background-color: #FFFFFF;
+                            padding: 20px;
+                            border-radius: 12px;
+                            margin-bottom: 12px;
+                            border: 1px solid #E0E0E0;
+                            border-left: 8px solid #2E7BE6;
+                            box-shadow: 2px 2px 5px rgba(0,0,0,0.07);
+                        ">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span style="font-size: 1.4em; font-weight: 800; color: #333333;">{axis}</span>
+                                <span style="font-size: 1.9em; font-weight: 900; color: #2E7BE6; line-height: 1;">{int(v1)}</span>
+                            </div>
+                            <p style="font-size: 1.05em; color: #777777; margin: 0; line-height: 1.3; font-weight: 500;">{short_desc}</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+            # --- Fiscal Snapshot ---
+            st.markdown("<div class='section-title'>III. Fiscal Snapshot</div>", unsafe_allow_html=True)
+            cf1, cf2, cf3, cf4 = st.columns(4)
+            city_fiscal_items = [
+                (cf1, "REVENUE", _fmt_budget(city_data["revenue"])),
+                (cf2, "EXPENDITURE", _fmt_budget(city_data["expenditure"])),
+                (cf3, "TAXES", _fmt_budget(city_data["taxes"])),
+                (cf4, "POPULATION", f"{city_data['population']:,}"),
+            ]
+            for col, label, value in city_fiscal_items:
+                col.markdown(f"""
+                <div style="background:#fff; padding:20px; border-radius:12px; text-align:center; border:1px solid #e2e8f0; box-shadow:2px 2px 5px rgba(0,0,0,0.04);">
+                    <div style="font-size:0.7em; font-weight:700; color:#94a3b8; letter-spacing:1px;">{label}</div>
+                    <div style="font-size:1.8em; font-weight:900; color:#2E7BE6; line-height:1.3;">{value}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # --- All Cities Ranking ---
+            st.markdown("<div class='section-title'>IV. All Cities Ranking</div>", unsafe_allow_html=True)
+            city_cols = st.columns(3)
+            for idx, c in enumerate(city_scores):
+                score = int(c["total"])
+                if score >= 700:
+                    border_color = "#10b981"
+                elif score >= 500:
+                    border_color = "#2E7BE6"
+                elif score >= 300:
+                    border_color = "#f59e0b"
+                else:
+                    border_color = "#ef4444"
+                with city_cols[idx % 3]:
+                    st.markdown(
+                        f"""<div style="background:#fff; border-radius:12px; padding:14px; margin-bottom:10px;
+                        border-left:4px solid {border_color}; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                        <div style="font-size:0.75em; color:#94a3b8; font-weight:600;">{c['state_abbr']}</div>
+                        <div style="font-size:0.95em; font-weight:700; color:#1e293b; margin:2px 0;">
+                        {c['name']}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+                        <span style="font-size:1.8em; font-weight:900; color:{border_color};">{score}</span>
+                        <span style="font-size:0.8em; color:#94a3b8;">pop. {c['population']:,}</span>
+                        </div></div>""",
+                        unsafe_allow_html=True,
+                    )
+        else:
+            st.error("Failed to load city data. Please check that census_data files exist.")
 
     # ===================================================================
     # RANKINGS TAB
