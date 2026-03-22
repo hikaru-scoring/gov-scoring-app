@@ -1,23 +1,28 @@
 # municipal_data.py
 """Census Bureau Individual Unit Finance file parser and municipal scoring logic."""
 
+import os
 import streamlit as st
 
 # ---------------------------------------------------------------------------
 # Data directory and file paths
 # ---------------------------------------------------------------------------
-DATA_DIR = "census_data"
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(_BASE_DIR, "census_data")
 
-DATA_FILES = {
-    2022: {
-        "pid": f"{DATA_DIR}/2022/2022_Individual_Unit_File/Fin_PID_2022.txt",
-        "finance": f"{DATA_DIR}/2022/2022_Individual_Unit_File/2022FinEstDAT_06052025modp_pu.txt",
-    },
-    2023: {
-        "pid": f"{DATA_DIR}/2023/2023_Individual_Unit_Files/Fin_PID_2023.txt",
-        "finance": f"{DATA_DIR}/2023/2023_Individual_Unit_Files/2023FinEstDAT_06052025modp_pu.txt",
-    },
-}
+def _data_files():
+    return {
+        2022: {
+            "pid": os.path.join(DATA_DIR, "2022", "2022_Individual_Unit_File", "Fin_PID_2022.txt"),
+            "finance": os.path.join(DATA_DIR, "2022", "2022_Individual_Unit_File", "2022FinEstDAT_06052025modp_pu.txt"),
+        },
+        2023: {
+            "pid": os.path.join(DATA_DIR, "2023", "2023_Individual_Unit_Files", "Fin_PID_2023.txt"),
+            "finance": os.path.join(DATA_DIR, "2023", "2023_Individual_Unit_Files", "2023FinEstDAT_06052025modp_pu.txt"),
+        },
+    }
+
+DATA_FILES = _data_files()
 
 # ---------------------------------------------------------------------------
 # State FIPS -> abbreviation lookup
