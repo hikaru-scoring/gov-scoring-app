@@ -542,61 +542,8 @@ def load_and_score_all_counties(year: int = 2022) -> list[dict]:
             scored.append(result)
             scored_fips.add(result["fips_county"])
 
-    # ADD counties that have ACS data but NOT Census fiscal data (fills white gaps!)
-    for fips, acs in acs_data.items():
-        if fips in scored_fips:
-            continue
-        if len(fips) != 5:
-            continue
-        state_fips = fips[:2]
-        if state_fips not in STATE_ABBR:
-            continue
-
-        # Score with ACS/BLS only (fiscal axes get neutral 100)
-        pop = acs.get("population", 0)
-        if pop <= 0:
-            continue
-
-        # Neutral fiscal scores since we don't have fiscal data
-        ax1 = 100.0  # Budget Balance - neutral
-        ax2 = 100.0  # Tax Base Strength - neutral
-        ax3 = 100.0  # Revenue Independence - neutral
-        ax4 = 100.0  # Spending Efficiency - neutral
-
-        # Economic Health from ACS/BLS
-        poverty_rate = acs.get("poverty_pop", 0) / pop
-        income_score = _clamp(acs.get("median_income", 0) / 500, 0, 100)
-        poverty_score = _clamp(100 - poverty_rate * 500, 0, 100)
-
-        unemp_rate = bls_data.get(fips)
-        if unemp_rate is not None:
-            unemp_score = _clamp(100 - unemp_rate * 15, 0, 100)
-            ax5 = _clamp((income_score * 0.4 + poverty_score * 0.3 + unemp_score * 0.3) * 2, 0, 200)
-        else:
-            ax5 = _clamp((income_score * 0.5 + poverty_score * 0.5) * 2, 0, 200)
-
-        axes = {
-            "Budget Balance": round(ax1, 1),
-            "Tax Base Strength": round(ax2, 1),
-            "Revenue Independence": round(ax3, 1),
-            "Spending Efficiency": round(ax4, 1),
-            "Economic Health": round(ax5, 1),
-        }
-
-        scored.append({
-            "name": acs.get("name", f"County {fips}"),
-            "gov_id": f"ACS_{fips}",
-            "state_fips": state_fips,
-            "state_abbr": STATE_ABBR.get(state_fips, "??"),
-            "population": pop,
-            "axes": axes,
-            "total": round(sum(axes.values()), 1),
-            "revenue": 0,
-            "expenditure": 0,
-            "taxes": 0,
-            "ig_revenue": 0,
-            "fips_county": fips,
-        })
+    # NOTE: Counties without Census fiscal data remain unscored (white on map).
+    # We do NOT fill them with neutral values — that would be misleading.
 
     scored.sort(key=lambda x: x["total"], reverse=True)
     return scored
